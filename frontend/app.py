@@ -282,10 +282,8 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
     gallery = gr.Gallery(
         label="Recent Generations",
         show_label=False,
-        columns=6,
-        rows=2,
-        height=200,
-        object_fit="cover",
+        columns=4,
+        object_fit="contain",
         allow_preview=True
     )
 
