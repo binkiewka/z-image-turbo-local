@@ -1,0 +1,42 @@
+services:
+  comfyui:
+    build: ./backend
+    container_name: z-image-backend
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ./models/diffusion_models:/app/ComfyUI/models/diffusion_models
+      - ./models/text_encoders:/app/ComfyUI/models/text_encoders
+      - ./models/vae:/app/ComfyUI/models/vae
+      - ./output:/app/ComfyUI/output
+    ports:
+      - "0.0.0.0:8188:8188"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  frontend:
+    build: ./frontend
+    container_name: z-image-frontend
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:7860:7860"
+    environment:
+      - COMFYUI_HOST=comfyui
+      - COMFYUI_PORT=8188
+    depends_on:
+      comfyui:
+        condition: service_healthy
