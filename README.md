@@ -9,6 +9,7 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 ## Features
 
 - **Fast Generation**: ~3 seconds per image with 8-step distilled model
+- **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-1.5B (runs on CPU)
 - **Local Deployment**: Complete privacy, runs entirely on your hardware
 - **User-Friendly UI**: Clean Gradio interface with real-time progress
 - **GGUF Quantization**: Optimized to fit in 12GB VRAM
@@ -23,7 +24,8 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 │  Frontend (Gradio)                                      │
 │  Port: 7860                                             │
 │  - User interface                                       │
-│  - WebSocket client for progress tracking              │
+│  - WebSocket client for progress tracking               │
+│  - Prompt Enhancement (Qwen2.5-1.5B on CPU)             │
 └─────────────────────┬───────────────────────────────────┘
                       │ HTTP + WebSocket
 ┌─────────────────────▼───────────────────────────────────┐
@@ -39,18 +41,21 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 │  - Z-Image-Turbo Q8_0 (7.2GB)                           │
 │  - Qwen 3 4B Text Encoder IQ4_XS (2.3GB)                │
 │  - Flux VAE (335MB)                                     │
+│  - Qwen2.5-1.5B-Instruct Q4 (~1GB, auto-downloaded)     │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## Requirements
 
 ### Hardware
+
 - **GPU**: NVIDIA RTX 3060 12GB (or similar with 12GB+ VRAM)
 - **RAM**: 16GB minimum (32GB recommended)
 - **Storage**: 15GB+ SSD space for models and Docker images
 - **OS**: Linux (tested on Linux Mint 21.3 / Ubuntu 22.04) or Windows with WSL2 (see [WSL2 Setup Guide](docs/setup-guides/Windows-WSL2.md))
 
 ### Software
+
 - Docker Engine (v24.0+)
 - Docker Compose (v2.20+)
 - NVIDIA Driver 550+ (CUDA 12.1 compatible)
@@ -160,11 +165,12 @@ This project officially supports:
 1. **Access the UI**: Open `http://localhost:7860` in your browser
 2. **Enter a prompt**: Describe the image you want (e.g., "a cat wearing a wizard hat")
 3. **Optional settings**:
+   - **✨ Enhance Prompt**: Enable AI-powered prompt expansion (~5-10s, downloads model on first use)
    - **Negative Prompt**: Things to avoid (e.g., "blurry, ugly, distorted")
    - **Seed**: Use -1 for random, or a specific number for reproducibility
    - **Steps**: 4-12 (default 8) - more steps = better quality but slower
    - **Aspect Ratio**: Choose from 1:1, 3:4, 4:3, 16:9, 9:16
-4. **Generate**: Click the button and wait ~3 seconds
+4. **Generate**: Click the button and wait ~3 seconds (or ~10-15s with enhancement)
 5. **Download**: Click the download link to save the image
 
 ## Configuration
@@ -192,25 +198,31 @@ The system uses ~11.4GB VRAM with default settings. If you experience OOM errors
 ## Troubleshooting
 
 ### "CUDA Out of Memory"
+
 - **Cause**: Resolution too high or other GPU processes running
 - **Fix**: Close other GPU apps, use lower resolution, reduce steps to 4-6
 
 ### "Models not loading"
+
 - **Cause**: Model files not downloaded or in wrong folder
 - **Fix**: Verify files exist in `models/diffusion_models/`, `models/text_encoders/`, `models/vae/`
 
 ### "WebSocket connection failed"
+
 - **Cause**: Backend still starting up
 - **Fix**: Wait 30-60 seconds, check logs with `docker compose logs backend`
 
 ### "Generation is slow (30s+)"
+
 - **Cause**: Models loading from disk on each request
 - **Fix**: After first generation, subsequent ones should be ~3s. If not, check if GPU is being used:
+
   ```bash
   docker exec z-image-backend nvidia-smi
   ```
 
 ### "Invalid prompt validation error"
+
 - **Cause**: Model files not found or incompatible versions
 - **Fix**: Verify exact filenames match:
   - `z_image_turbo-Q8_0.gguf`
@@ -261,6 +273,7 @@ docker compose logs -f comfyui   # Backend only
 ## License
 
 This project is for personal use. Model licenses:
+
 - Z-Image-Turbo: Apache 2.0
 - FLUX.1-schnell: Apache 2.0
 - ComfyUI: GPL-3.0
@@ -268,6 +281,7 @@ This project is for personal use. Model licenses:
 ## Support
 
 For issues or questions:
+
 1. Check [Troubleshooting](#troubleshooting) section
 2. Review Docker logs: `docker compose logs -f`
 3. Verify GPU access: `docker exec z-image-backend nvidia-smi`

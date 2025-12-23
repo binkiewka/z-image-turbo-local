@@ -15,7 +15,7 @@ services:
     ports:
       - "0.0.0.0:8188:8188"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8188/system_stats" ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -26,7 +26,7 @@ services:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [gpu]
+              capabilities: [ gpu ]
 
   frontend:
     build: ./frontend
@@ -37,6 +37,8 @@ services:
     environment:
       - COMFYUI_HOST=comfyui
       - COMFYUI_PORT=8188
+    volumes:
+      - ./models/llm:/app/models/llm
     depends_on:
       comfyui:
         condition: service_healthy

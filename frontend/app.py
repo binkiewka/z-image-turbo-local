@@ -11,6 +11,7 @@ import gradio as gr
 import httpx
 import websockets
 from PIL import Image
+from prompt_enhancer import enhance_prompt
 
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
 COMFYUI_PORT = os.environ.get("COMFYUI_PORT", "8188")
@@ -144,16 +145,29 @@ async def fetch_image(filename: str, subfolder: str) -> Image.Image:
         return Image.open(BytesIO(response.content))
 
 
-def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, aspect_ratio: str, current_gallery: list, progress=gr.Progress()):
-    """Main generation function with progress tracking."""
+def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, aspect_ratio: str, enhance_enabled: bool, current_gallery: list, progress=gr.Progress()):
+    """Main generation function with progress tracking and optional prompt enhancement."""
     global gallery_history
 
     if not prompt or not prompt.strip():
-        return None, "Please enter a prompt", None, current_gallery
+        return None, "Please enter a prompt", None, current_gallery, prompt
+
+    # Enhance prompt if enabled
+    actual_prompt = prompt.strip()
+    if enhance_enabled:
+        progress(0, desc="Enhancing prompt...")
+        try:
+            def status_callback(msg):
+                progress(0.1, desc=msg)
+            actual_prompt = enhance_prompt(prompt.strip(), status_callback)
+            progress(0.2, desc="Prompt enhanced!")
+        except Exception as e:
+            progress(0.2, desc=f"Enhancement failed, using original: {e}")
+            actual_prompt = prompt.strip()
 
     width, height = ASPECT_RATIOS.get(aspect_ratio, (1024, 1024))
     workflow, actual_seed = prepare_workflow(
-        prompt.strip(),
+        actual_prompt,
         negative_prompt.strip() if negative_prompt else "",
         int(seed),
         int(steps),
@@ -175,7 +189,7 @@ def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, asp
         return await submit_and_wait_with_progress(workflow, client_id, update_progress)
 
     try:
-        progress(0, desc="Starting generation...")
+        progress(0.3 if enhance_enabled else 0, desc="Starting generation...")
         result = asyncio.run(run_generation())
 
         if result:
@@ -191,19 +205,19 @@ def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, asp
             gallery_history.insert(0, gallery_entry)
             gallery_history = gallery_history[:12]  # Keep last 12
 
-            return image, f"Done! Seed: {actual_seed}", str(download_path), gallery_history
+            return image, f"Done! Seed: {actual_seed}", str(download_path), gallery_history, actual_prompt
         else:
-            return None, "No image generated", None, current_gallery
+            return None, "No image generated", None, current_gallery, actual_prompt
 
     except Exception as e:
-        return None, f"Error: {str(e)}", None, current_gallery
+        return None, f"Error: {str(e)}", None, current_gallery, actual_prompt
 
 
 def warmup_models():
     """Pre-load models by running a dummy generation at startup."""
     print("Warming up models... (this may take 10-30 seconds on first run)")
     try:
-        result = generate_image("warmup test", "", 42, 8, "1:1 (1024x1024)", [], gr.Progress())
+        result = generate_image("warmup test", "", 42, 8, "1:1 (1024x1024)", False, [], gr.Progress())
         if result[0] is not None:
             print("Models loaded successfully!")
             # Clear the warmup image from gallery
@@ -261,6 +275,12 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 info="More steps = better quality, slower"
             )
 
+            enhance_prompt_checkbox = gr.Checkbox(
+                label="✨ Enhance Prompt",
+                value=False,
+                info="Use AI to enhance your prompt with detailed visual descriptions (~5-10s)"
+            )
+
             generate_btn = gr.Button("Generate", variant="primary", size="lg")
             status = gr.Textbox(label="Status", interactive=False)
 
@@ -275,6 +295,14 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 label="Download",
                 visible=True,
                 interactive=False
+            )
+
+            enhanced_prompt_output = gr.Textbox(
+                label="Enhanced Prompt (used for generation)",
+                interactive=False,
+                visible=True,
+                lines=4,
+                max_lines=8
             )
 
     # Gallery section
@@ -293,15 +321,15 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
     # Generate button click
     generate_btn.click(
         fn=generate_image,
-        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, gallery_state],
-        outputs=[output_image, status, download_file, gallery]
+        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, enhance_prompt_checkbox, gallery_state],
+        outputs=[output_image, status, download_file, gallery, enhanced_prompt_output]
     )
 
     # Enter key in prompt
     prompt.submit(
         fn=generate_image,
-        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, gallery_state],
-        outputs=[output_image, status, download_file, gallery]
+        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, enhance_prompt_checkbox, gallery_state],
+        outputs=[output_image, status, download_file, gallery, enhanced_prompt_output]
     )
 
 
