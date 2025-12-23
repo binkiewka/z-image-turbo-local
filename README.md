@@ -110,19 +110,13 @@ sudo systemctl restart docker
 
 ### 4. Download Models
 
-You'll need a HuggingFace account and access token:
+Create model directories and download the required files:
 
 ```bash
-# Install HuggingFace CLI
-pip install -U huggingface_hub
-
-# Login (get token from https://huggingface.co/settings/tokens)
-huggingface-cli login
-
-# Accept license at https://huggingface.co/black-forest-labs/FLUX.1-schnell
-
-# Download models
 cd image-gen
+
+# Create model directories
+mkdir -p models/diffusion_models models/text_encoders models/vae
 
 # Z-Image-Turbo diffusion model (7.2GB)
 wget -O models/diffusion_models/z_image_turbo-Q8_0.gguf \
@@ -131,9 +125,28 @@ wget -O models/diffusion_models/z_image_turbo-Q8_0.gguf \
 # Qwen 3 4B text encoder (2.3GB)
 wget -O models/text_encoders/Qwen_3_4b-IQ4_XS.gguf \
   "https://huggingface.co/worstplayer/Z-Image_Qwen_3_4b_text_encoder_GGUF/resolve/main/Qwen_3_4b-IQ4_XS.gguf"
+```
 
-# Flux VAE (335MB)
-huggingface-cli download black-forest-labs/FLUX.1-schnell ae.safetensors --local-dir models/vae/
+**Flux VAE (335MB) - Manual Download Required:**
+
+The VAE model requires accepting a license on HuggingFace:
+
+1. Visit [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
+2. Log in to HuggingFace and click "Agree and access repository"
+3. Download [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell/blob/main/ae.safetensors) (click the download ↓ button)
+4. Move it to the models folder:
+
+   ```bash
+   mv ~/Downloads/ae.safetensors models/vae/
+   ```
+
+**Verify downloads:**
+
+```bash
+ls -lh models/*/
+# diffusion_models/z_image_turbo-Q8_0.gguf  ~7.2GB
+# text_encoders/Qwen_3_4b-IQ4_XS.gguf        ~2.3GB  
+# vae/ae.safetensors                         ~335MB
 ```
 
 ### 5. Build and Run

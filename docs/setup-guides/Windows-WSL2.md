@@ -79,6 +79,7 @@ wsl --install Ubuntu-22.04
 ```
 
 This command will:
+
 - Enable the required Windows features (WSL and Virtual Machine Platform)
 - Download and install WSL2
 - Download and install Ubuntu 22.04 from the Microsoft Store
@@ -186,6 +187,7 @@ If you see this output, GPU passthrough is working correctly!
 ## Step 3A: Install Docker CE inside WSL2 (Recommended)
 
 **Why this approach is recommended:**
+
 - Completely free for all users (no commercial licensing restrictions)
 - Native Linux experience, aligns with the main project README
 - Full control over Docker configuration
@@ -326,11 +328,13 @@ If you see GPU information, **GPU passthrough is working!** You can proceed to [
 If you prefer a GUI-based Docker experience or are new to Docker, you can use Docker Desktop for Windows with the WSL2 backend instead of Docker CE.
 
 **When to choose Docker Desktop:**
+
 - You prefer a graphical interface for managing containers
 - You're new to Docker and want an easier setup
 - You're okay with commercial licensing restrictions
 
 **⚠️ Licensing Note:** Docker Desktop is free for:
+
 - Personal use
 - Education
 - Non-commercial open source projects
@@ -374,11 +378,12 @@ If you see GPU information, you're ready to proceed to [Step 4](#step-4-clone-re
 
 ## Step 4: Clone Repository and Setup
 
-### 4.1 Filesystem Choice - Important for Performance!
+### 4.1 Filesystem Choice - Important for Performance
 
 **⚠️ Use WSL2's native filesystem, NOT the Windows filesystem mounted at `/mnt/c`.**
 
 **Why?**
+
 - WSL2 native filesystem (ext4): Fast, optimized for Linux
 - Windows filesystem via `/mnt/c`: 2-5x slower due to 9P protocol overhead
 - Model files are large (10GB+), and performance is critical
@@ -436,38 +441,9 @@ drwxr-xr-x  2 user user 4096 Dec 23 10:00 vae
 
 You'll need to download three model files totaling ~10GB.
 
-### 5.1 Install HuggingFace CLI
+### 5.1 Download via wget
 
-```bash
-pip install -U huggingface_hub
-```
-
-If `pip` is not found, install it first:
-
-```bash
-sudo apt install -y python3-pip
-pip install -U huggingface_hub
-```
-
-### 5.2 Login to HuggingFace
-
-You'll need a HuggingFace account and access token.
-
-1. Create an account at [huggingface.co](https://huggingface.co)
-2. Get your token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-3. Login:
-
-```bash
-huggingface-cli login
-```
-
-Paste your token when prompted.
-
-### 5.3 Accept FLUX License
-
-Visit [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell) and click "Agree and access repository".
-
-### 5.4 Download Model Files
+From your `image-gen` directory, download the two public models:
 
 **Z-Image-Turbo diffusion model (7.2GB):**
 
@@ -483,13 +459,27 @@ wget -O models/text_encoders/Qwen_3_4b-IQ4_XS.gguf \
   "https://huggingface.co/worstplayer/Z-Image_Qwen_3_4b_text_encoder_GGUF/resolve/main/Qwen_3_4b-IQ4_XS.gguf"
 ```
 
-**Flux VAE (335MB):**
+### 5.2 Flux VAE - Manual Download Required (335MB)
+
+> [!IMPORTANT]
+> This model is gated and requires HuggingFace authentication. You must download it manually through your web browser.
+
+1. Visit [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
+2. Log in to HuggingFace (create an account if needed)
+3. Click "Agree and access repository"
+4. Navigate to: [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell/blob/main/ae.safetensors)
+5. Click the "download" button (↓ icon) - saves to Windows Downloads folder
+6. Copy from Windows to WSL2:
 
 ```bash
-huggingface-cli download black-forest-labs/FLUX.1-schnell ae.safetensors --local-dir models/vae/
+# Copy from Windows Downloads to WSL2 (adjust username)
+cp /mnt/c/Users/YOUR_WINDOWS_USERNAME/Downloads/ae.safetensors ~/image-gen/models/vae/
 ```
 
-### 5.5 Verify Downloads
+> [!WARNING]
+> **Common mistake:** If the file shows `0 bytes`, the download failed. The actual file should be approximately **335MB**.
+
+### 5.3 Verify Downloads
 
 Check file sizes:
 
@@ -500,6 +490,7 @@ ls -lh models/vae/
 ```
 
 **Expected sizes:**
+
 - `z_image_turbo-Q8_0.gguf`: ~7.2GB
 - `Qwen_3_4b-IQ4_XS.gguf`: ~2.3GB
 - `ae.safetensors`: ~335MB
@@ -564,6 +555,7 @@ http://localhost:7860
 ### 7.2 Expected UI
 
 You should see a Gradio interface with:
+
 - Prompt text box
 - Negative prompt text box
 - Seed input (-1 for random)
@@ -599,6 +591,7 @@ Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to mo
 ### Issue: "nvidia-smi: command not found" in WSL2
 
 **Possible Causes:**
+
 1. Windows NVIDIA driver not installed
 2. WSL2 version is 1 instead of 2
 3. Windows version too old (need 21H2+)
@@ -610,10 +603,13 @@ Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to mo
    - If not found, reinstall Windows NVIDIA driver (Step 2)
 
 2. **Verify WSL version:**
+
    ```bash
    wsl -l -v
    ```
+
    Must show `VERSION 2`, not `1`. If showing `1`, convert to version 2:
+
    ```powershell
    wsl --set-version Ubuntu-22.04 2
    ```
@@ -626,34 +622,40 @@ Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to mo
 ### Issue: "Docker daemon not starting"
 
 **Possible Causes:**
+
 1. Docker service not running
 2. systemd not enabled in WSL2
 
 **Solutions:**
 
 1. **Start Docker manually:**
+
    ```bash
    sudo service docker start
    ```
 
 2. **Check Docker status:**
+
    ```bash
    sudo systemctl status docker
    ```
 
 3. **Enable systemd in WSL2 (Ubuntu 22.04):**
    Edit `/etc/wsl.conf`:
+
    ```bash
    sudo nano /etc/wsl.conf
    ```
 
    Add these lines:
+
    ```ini
    [boot]
    systemd=true
    ```
 
    Save (Ctrl+O, Enter, Ctrl+X), then restart WSL2:
+
    ```powershell
    wsl --shutdown
    ```
@@ -663,11 +665,13 @@ Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to mo
 ### Issue: "Cannot connect to Docker daemon"
 
 **Error message:**
+
 ```
 Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
 ```
 
 **Possible Causes:**
+
 1. User not in `docker` group
 2. Logout/login required after `usermod`
 3. Docker service not running
@@ -675,22 +679,27 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 **Solutions:**
 
 1. **Verify group membership:**
+
    ```bash
    groups
    ```
 
    Should include `docker`. If not:
+
    ```bash
    sudo usermod -aG docker $USER
    ```
 
 2. **Logout and login:**
+
    ```bash
    exit
    ```
+
    Reopen Ubuntu from Start menu.
 
 3. **Restart Docker:**
+
    ```bash
    sudo systemctl restart docker
    ```
@@ -698,11 +707,13 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 ### Issue: "No NVIDIA GPU devices found"
 
 **Error in container logs:**
+
 ```
 RuntimeError: No CUDA GPUs are available
 ```
 
 **Possible Causes:**
+
 1. Windows NVIDIA driver too old (<470)
 2. nvidia-container-toolkit not installed
 3. Docker runtime not configured
@@ -710,12 +721,15 @@ RuntimeError: No CUDA GPUs are available
 **Solutions:**
 
 1. **Verify driver version:**
+
    ```bash
    nvidia-smi
    ```
+
    Check "Driver Version" in output. Must be 470+, recommend 550+.
 
 2. **Test GPU in Docker:**
+
    ```bash
    docker run --rm --gpus all nvidia/cuda:12.1.1-runtime-ubuntu22.04 nvidia-smi
    ```
@@ -723,6 +737,7 @@ RuntimeError: No CUDA GPUs are available
    If this fails, nvidia-container-toolkit is not properly configured.
 
 3. **Reinstall nvidia-container-toolkit:**
+
    ```bash
    sudo apt-get install --reinstall -y nvidia-container-toolkit
    sudo nvidia-ctk runtime configure --runtime=docker
@@ -732,6 +747,7 @@ RuntimeError: No CUDA GPUs are available
 ### Issue: "Models loading slow or from /mnt/c"
 
 **Symptoms:**
+
 - First image generation takes >60 seconds
 - Subsequent images also slow (>10 seconds)
 
@@ -740,6 +756,7 @@ RuntimeError: No CUDA GPUs are available
 **Solution:**
 
 1. **Check current location:**
+
    ```bash
    pwd
    ```
@@ -747,6 +764,7 @@ RuntimeError: No CUDA GPUs are available
    If shows `/mnt/c/...`, you're in the wrong place.
 
 2. **Move to WSL2 filesystem:**
+
    ```bash
    cd ~/
    cp -r /mnt/c/Users/YourName/Desktop/image-gen ~/image-gen
@@ -754,6 +772,7 @@ RuntimeError: No CUDA GPUs are available
    ```
 
 3. **Rebuild containers:**
+
    ```bash
    docker compose down -v
    docker compose build --no-cache
@@ -761,16 +780,19 @@ RuntimeError: No CUDA GPUs are available
    ```
 
 **Performance comparison:**
+
 - `/mnt/c` (Windows filesystem): 2-5x slower
 - `~/` (WSL2 ext4): Optimal performance
 
 ### Issue: "Can't access localhost:7860 from Windows"
 
 **Symptoms:**
+
 - Browser shows "This site can't be reached"
 - Connection refused or timeout
 
 **Possible Causes:**
+
 1. Containers not running
 2. Windows Firewall blocking WSL2
 3. WSL2 networking issue
@@ -778,6 +800,7 @@ RuntimeError: No CUDA GPUs are available
 **Solutions:**
 
 1. **Verify containers are running:**
+
    ```bash
    docker compose ps
    ```
@@ -785,6 +808,7 @@ RuntimeError: No CUDA GPUs are available
    Both `z-image-backend` and `z-image-frontend` should show "Up".
 
 2. **Check WSL2 IP address:**
+
    ```bash
    ip addr show eth0 | grep inet
    ```
@@ -798,6 +822,7 @@ RuntimeError: No CUDA GPUs are available
 
 4. **Port forwarding:**
    WSL2 should auto-forward ports, but you can manually forward:
+
    ```powershell
    # In PowerShell (Admin)
    netsh interface portproxy add v4tov4 listenport=7860 listenaddress=0.0.0.0 connectport=7860 connectaddress=<wsl-ip>
@@ -806,6 +831,7 @@ RuntimeError: No CUDA GPUs are available
 ### Issue: "Port already in use"
 
 **Error message:**
+
 ```
 Error starting userland proxy: listen tcp4 0.0.0.0:7860: bind: address already in use
 ```
@@ -813,18 +839,21 @@ Error starting userland proxy: listen tcp4 0.0.0.0:7860: bind: address already i
 **Solutions:**
 
 1. **Find process using the port:**
+
    ```bash
    sudo lsof -i :7860
    sudo lsof -i :8188
    ```
 
 2. **Kill the process:**
+
    ```bash
    sudo kill -9 <PID>
    ```
 
 3. **Change ports in docker-compose.yml:**
    Edit `docker-compose.yml`:
+
    ```yaml
    ports:
      - "0.0.0.0:7861:7860"  # Changed from 7860 to 7861
@@ -832,9 +861,73 @@ Error starting userland proxy: listen tcp4 0.0.0.0:7860: bind: address already i
 
    **Note:** Avoid using ports 8081 and 8082 (reserved for other services).
 
+### Issue: "Model not found" / VAE Symlink Error
+
+**Error message:**
+
+```
+WARNING path /app/ComfyUI/models/vae/ae.safetensors exists but doesn't link anywhere, skipping.
+FileNotFoundError: Model in folder 'vae' with filename 'ae.safetensors' not found.
+```
+
+**Causes:**
+
+1. **0-byte placeholder file** - Most common! The file exists but is empty (failed or incomplete download)
+2. **Broken symlink** - The file is a symlink that points nowhere (can happen with certain download tools)
+3. **Incomplete download** - Browser download was interrupted
+
+**Diagnosis:**
+
+First, check if the file is real or empty:
+
+```bash
+ls -lh models/vae/ae.safetensors
+```
+
+- ✅ **Good:** Shows `335M` or similar size
+- ❌ **Bad:** Shows `0` bytes - the file is empty/broken!
+- ❌ **Bad:** Shows `->` arrow (symlink) pointing to another path
+
+**Solution (if file is 0 bytes or broken):**
+
+1. **Delete the broken file:**
+
+   ```bash
+   rm models/vae/ae.safetensors
+   ```
+
+2. **Manually download the VAE model:**
+
+   Since this model is gated (requires HuggingFace authentication), you must download manually:
+
+   a. Visit [ae.safetensors on HuggingFace](https://huggingface.co/black-forest-labs/FLUX.1-schnell/blob/main/ae.safetensors)
+   b. Log in and accept the license if prompted
+   c. Click the download button (↓)
+   d. Copy from Windows Downloads to WSL2:
+
+   ```bash
+   cp /mnt/c/Users/YOUR_USERNAME/Downloads/ae.safetensors ~/image-gen/models/vae/
+   ```
+
+3. **Verify the file is real (~335MB):**
+
+   ```bash
+   ls -lh models/vae/ae.safetensors
+   # Should show: -rw-rw-r-- 1 user user 335M Dec 23 12:00 ae.safetensors
+   ```
+
+4. **Restart containers:**
+
+   ```bash
+   docker compose restart
+   ```
+
+---
+
 ### Issue: "CUDA Out of Memory" in WSL2
 
 **Error in logs:**
+
 ```
 torch.cuda.OutOfMemoryError: CUDA out of memory
 ```
@@ -853,12 +946,14 @@ torch.cuda.OutOfMemoryError: CUDA out of memory
 
 4. **Allocate more VRAM to WSL2:**
    Edit `C:\Users\<username>\.wslconfig`:
+
    ```ini
    [wsl2]
    memory=16GB
    ```
 
    Restart WSL2:
+
    ```powershell
    wsl --shutdown
    ```
@@ -922,11 +1017,13 @@ Then reopen Ubuntu from Start menu.
    Already enabled with `docker-buildx-plugin`.
 
 2. **Prune unused resources:**
+
    ```bash
    docker system prune -a
    ```
 
 3. **Monitor resource usage:**
+
    ```bash
    docker stats
    ```
@@ -934,11 +1031,13 @@ Then reopen Ubuntu from Start menu.
 ### GPU Performance
 
 1. **Monitor GPU usage:**
+
    ```bash
    watch -n 1 nvidia-smi
    ```
 
 2. **Check VRAM during generation:**
+
    ```bash
    docker exec z-image-backend nvidia-smi
    ```
@@ -977,14 +1076,19 @@ Then reopen Ubuntu from Start menu.
 1. **Check this troubleshooting section** for WSL2-specific issues
 2. **Review main project README** for general application issues
 3. **Check Docker logs:**
+
    ```bash
    docker compose logs -f
    ```
+
 4. **Verify GPU access:**
+
    ```bash
    docker exec z-image-backend nvidia-smi
    ```
+
 5. **Check WSL2 logs:**
+
    ```bash
    dmesg | grep -i nvidia
    ```
