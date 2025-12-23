@@ -6,7 +6,7 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 ![GPU](https://img.shields.io/badge/GPU-RTX%203060%2012GB-green)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 
-![Z-Image-Turbo Interface](https://i.ibb.co/w8Dx58C/2025-12-23-16-06.jpg)
+<img src="https://i.ibb.co/w8Dx58C/2025-12-23-16-06.jpg" alt="Z-Image-Turbo Interface" />
 
 ## Features
 
