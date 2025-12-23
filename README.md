@@ -48,7 +48,7 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 - **GPU**: NVIDIA RTX 3060 12GB (or similar with 12GB+ VRAM)
 - **RAM**: 16GB minimum (32GB recommended)
 - **Storage**: 15GB+ SSD space for models and Docker images
-- **OS**: Linux (tested on Linux Mint 21.3 / Ubuntu 22.04)
+- **OS**: Linux (tested on Linux Mint 21.3 / Ubuntu 22.04) or Windows with WSL2 (see [WSL2 Setup Guide](docs/setup-guides/Windows-WSL2.md))
 
 ### Software
 - Docker Engine (v24.0+)
@@ -143,6 +143,17 @@ docker compose up -d
 # View logs
 docker compose logs -f
 ```
+
+## Platform Support
+
+This project officially supports:
+
+- **Linux** (Ubuntu 22.04, Linux Mint 21.3, or similar): Follow the [Installation](#installation) section above
+- **Windows with WSL2**: Follow the comprehensive [Windows WSL2 Setup Guide](docs/setup-guides/Windows-WSL2.md)
+  - Includes step-by-step WSL2 installation
+  - NVIDIA GPU passthrough configuration
+  - Docker setup (both Docker CE and Docker Desktop options)
+  - WSL2-specific troubleshooting and performance optimization
 
 ## Usage
 
