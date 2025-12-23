@@ -479,21 +479,37 @@ cp /mnt/c/Users/YOUR_WINDOWS_USERNAME/Downloads/ae.safetensors ~/z-image-turbo-l
 > [!WARNING]
 > **Common mistake:** If the file shows `0 bytes`, the download failed. The actual file should be approximately **335MB**.
 
-### 5.3 Verify Downloads
+### 5.3 Verify Downloads (CRITICAL!)
 
-Check file sizes:
+> [!CAUTION]
+> **Do NOT proceed to the next step until all files pass verification.** A 0-byte or missing VAE file is the #1 cause of startup failures.
+
+Run this verification command:
 
 ```bash
-ls -lh models/diffusion_models/
-ls -lh models/text_encoders/
-ls -lh models/vae/
+echo "=== Model Verification ===" && \
+for f in models/diffusion_models/z_image_turbo-Q8_0.gguf models/text_encoders/Qwen_3_4b-IQ4_XS.gguf models/vae/ae.safetensors; do \
+  if [ ! -f "$f" ]; then echo "❌ MISSING: $f"; \
+  elif [ ! -s "$f" ]; then echo "❌ EMPTY (0 bytes): $f - DELETE AND RE-DOWNLOAD!"; \
+  elif [ -L "$f" ]; then echo "❌ SYMLINK (broken): $f - DELETE AND RE-DOWNLOAD!"; \
+  else echo "✅ OK: $f ($(du -h "$f" | cut -f1))"; fi; \
+done
 ```
 
-**Expected sizes:**
+**Expected output (all files should show ✅):**
 
-- `z_image_turbo-Q8_0.gguf`: ~7.2GB
-- `Qwen_3_4b-IQ4_XS.gguf`: ~2.3GB
-- `ae.safetensors`: ~335MB
+```
+=== Model Verification ===
+✅ OK: models/diffusion_models/z_image_turbo-Q8_0.gguf (7.2G)
+✅ OK: models/text_encoders/Qwen_3_4b-IQ4_XS.gguf (2.3G)
+✅ OK: models/vae/ae.safetensors (335M)
+```
+
+**If any file shows ❌:**
+
+1. Delete the broken file: `rm <path-to-file>`
+2. Re-download following the instructions above
+3. For the VAE file, you MUST download via browser and copy from Windows Downloads
 
 ---
 

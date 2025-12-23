@@ -145,14 +145,15 @@ The VAE model requires accepting a license on HuggingFace:
    mv ~/Downloads/ae.safetensors models/vae/
    ```
 
-**Verify downloads:**
+**Verify downloads (important!):**
 
 ```bash
-ls -lh models/*/
-# diffusion_models/z_image_turbo-Q8_0.gguf  ~7.2GB
-# text_encoders/Qwen_3_4b-IQ4_XS.gguf        ~2.3GB  
-# vae/ae.safetensors                         ~335MB
+ls -lh models/diffusion_models/  # Should show ~7.2GB
+ls -lh models/text_encoders/      # Should show ~2.3GB
+ls -lh models/vae/                 # Should show ~335MB (NOT 0 bytes!)
 ```
+
+> ⚠️ If any file shows **0 bytes**, delete it and re-download. This is a common issue that causes startup failures.
 
 ### 6. Build and Run
 
