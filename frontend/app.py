@@ -38,15 +38,15 @@ with open("workflow_api.json", "r") as f:
 gallery_history = []
 
 
-def prepare_workflow(prompt: str, negative_prompt: str, seed: int, steps: int, width: int, height: int) -> tuple[dict, int]:
+def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int) -> tuple[dict, int]:
     """Prepare the workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
 
     # Positive prompt
     workflow["8"]["inputs"]["text"] = prompt
 
-    # Negative prompt
-    workflow["3"]["inputs"]["text"] = negative_prompt
+    # Negative prompt (not used by Z-Image-Turbo, but keep empty for workflow compatibility)
+    workflow["3"]["inputs"]["text"] = ""
 
     # Seed
     if seed == -1:
@@ -145,30 +145,17 @@ async def fetch_image(filename: str, subfolder: str) -> Image.Image:
         return Image.open(BytesIO(response.content))
 
 
-def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, aspect_ratio: str, enhance_enabled: bool, current_gallery: list, progress=gr.Progress()):
-    """Main generation function with progress tracking and optional prompt enhancement."""
+def generate_image(prompt: str, seed: int, steps: int, aspect_ratio: str, current_gallery: list, progress=gr.Progress()):
+    """Main generation function with progress tracking."""
     global gallery_history
 
     if not prompt or not prompt.strip():
-        return None, "Please enter a prompt", None, current_gallery, prompt
+        return None, "Please enter a prompt", None, current_gallery
 
-    # Enhance prompt if enabled
     actual_prompt = prompt.strip()
-    if enhance_enabled:
-        progress(0, desc="Enhancing prompt...")
-        try:
-            def status_callback(msg):
-                progress(0.1, desc=msg)
-            actual_prompt = enhance_prompt(prompt.strip(), status_callback)
-            progress(0.2, desc="Prompt enhanced!")
-        except Exception as e:
-            progress(0.2, desc=f"Enhancement failed, using original: {e}")
-            actual_prompt = prompt.strip()
-
     width, height = ASPECT_RATIOS.get(aspect_ratio, (1024, 1024))
     workflow, actual_seed = prepare_workflow(
         actual_prompt,
-        negative_prompt.strip() if negative_prompt else "",
         int(seed),
         int(steps),
         width,
@@ -189,7 +176,7 @@ def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, asp
         return await submit_and_wait_with_progress(workflow, client_id, update_progress)
 
     try:
-        progress(0.3 if enhance_enabled else 0, desc="Starting generation...")
+        progress(0, desc="Starting generation...")
         result = asyncio.run(run_generation())
 
         if result:
@@ -205,19 +192,40 @@ def generate_image(prompt: str, negative_prompt: str, seed: int, steps: int, asp
             gallery_history.insert(0, gallery_entry)
             gallery_history = gallery_history[:12]  # Keep last 12
 
-            return image, f"Done! Seed: {actual_seed}", str(download_path), gallery_history, actual_prompt
+            return image, f"Done! Seed: {actual_seed}", str(download_path), gallery_history
         else:
-            return None, "No image generated", None, current_gallery, actual_prompt
+            return None, "No image generated", None, current_gallery
 
     except Exception as e:
-        return None, f"Error: {str(e)}", None, current_gallery, actual_prompt
+        return None, f"Error: {str(e)}", None, current_gallery
+
+
+def enhance_only(prompt, progress=gr.Progress()):
+    """Enhance prompt without generating image."""
+    if not prompt or not prompt.strip():
+        return "", "Please enter a prompt first", gr.update(visible=False)
+
+    progress(0, desc="Enhancing prompt...")
+    try:
+        def status_callback(msg):
+            progress(0.5, desc=msg)
+        enhanced = enhance_prompt(prompt.strip(), status_callback)
+        progress(1, desc="Prompt enhanced!")
+        return enhanced, "✨ Prompt enhanced! Click 'Generate with Enhanced' or 'Copy to Prompt'", gr.update(visible=True)
+    except Exception as e:
+        return "", f"Enhancement failed: {e}", gr.update(visible=False)
+
+
+def copy_to_prompt(enhanced_text):
+    """Copy enhanced prompt to main prompt field."""
+    return enhanced_text, gr.update(visible=False), ""
 
 
 def warmup_models():
     """Pre-load models by running a dummy generation at startup."""
     print("Warming up models... (this may take 10-30 seconds on first run)")
     try:
-        result = generate_image("warmup test", "", 42, 8, "1:1 (1024x1024)", False, [], gr.Progress())
+        result = generate_image("warmup test", 42, 8, "1:1 (1024x1024)", [], gr.Progress())
         if result[0] is not None:
             print("Models loaded successfully!")
             # Clear the warmup image from gallery
@@ -246,12 +254,18 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 max_lines=6
             )
 
-            negative_prompt = gr.Textbox(
-                label="Negative Prompt",
-                placeholder="blurry, ugly, distorted, low quality...",
-                lines=2,
-                max_lines=4
+            enhanced_prompt_output = gr.Textbox(
+                label="✨ Enhanced Prompt",
+                interactive=False,
+                visible=True,
+                lines=3,
+                max_lines=6,
+                placeholder="Click 'Enhance' to get an AI-expanded prompt..."
             )
+
+            with gr.Row(visible=False) as enhanced_actions:
+                generate_enhanced_btn = gr.Button("🎨 Generate with Enhanced", variant="primary")
+                copy_prompt_btn = gr.Button("📋 Copy to Prompt", variant="secondary")
 
             with gr.Row():
                 seed = gr.Number(
@@ -275,13 +289,9 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 info="More steps = better quality, slower"
             )
 
-            enhance_prompt_checkbox = gr.Checkbox(
-                label="✨ Enhance Prompt",
-                value=False,
-                info="Use AI to enhance your prompt with detailed visual descriptions (~5-10s)"
-            )
-
-            generate_btn = gr.Button("Generate", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("🎨 Generate", variant="primary", size="lg")
+                enhance_btn = gr.Button("✨ Enhance", variant="secondary", size="lg")
             status = gr.Textbox(label="Status", interactive=False)
 
         with gr.Column(scale=1):
@@ -297,14 +307,6 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 interactive=False
             )
 
-            enhanced_prompt_output = gr.Textbox(
-                label="Enhanced Prompt (used for generation)",
-                interactive=False,
-                visible=True,
-                lines=4,
-                max_lines=8
-            )
-
     # Gallery section
     gr.Markdown("### History")
     gallery = gr.Gallery(
@@ -318,18 +320,39 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
     # Hidden state for gallery
     gallery_state = gr.State([])
 
-    # Generate button click
+    # Generate button click - uses original prompt
     generate_btn.click(
         fn=generate_image,
-        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, enhance_prompt_checkbox, gallery_state],
-        outputs=[output_image, status, download_file, gallery, enhanced_prompt_output]
+        inputs=[prompt, seed, steps, aspect_ratio, gallery_state],
+        outputs=[output_image, status, download_file, gallery]
     )
 
-    # Enter key in prompt
+    # Enter key in prompt - uses original prompt
     prompt.submit(
         fn=generate_image,
-        inputs=[prompt, negative_prompt, seed, steps, aspect_ratio, enhance_prompt_checkbox, gallery_state],
-        outputs=[output_image, status, download_file, gallery, enhanced_prompt_output]
+        inputs=[prompt, seed, steps, aspect_ratio, gallery_state],
+        outputs=[output_image, status, download_file, gallery]
+    )
+
+    # Enhance button click - only enhances, no generation
+    enhance_btn.click(
+        fn=enhance_only,
+        inputs=[prompt],
+        outputs=[enhanced_prompt_output, status, enhanced_actions]
+    )
+
+    # Generate with enhanced prompt
+    generate_enhanced_btn.click(
+        fn=generate_image,
+        inputs=[enhanced_prompt_output, seed, steps, aspect_ratio, gallery_state],
+        outputs=[output_image, status, download_file, gallery]
+    )
+
+    # Copy enhanced prompt to main prompt field
+    copy_prompt_btn.click(
+        fn=copy_to_prompt,
+        inputs=[enhanced_prompt_output],
+        outputs=[prompt, enhanced_actions, enhanced_prompt_output]
     )
 
 

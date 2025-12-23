@@ -9,11 +9,11 @@ A Dockerized AI image generation system running [Z-Image-Turbo](https://huggingf
 ## Features
 
 - **Fast Generation**: ~3 seconds per image with 8-step distilled model
-- **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-1.5B (runs on CPU)
+- **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-1.5B (runs on CPU, non-blocking)
 - **Local Deployment**: Complete privacy, runs entirely on your hardware
 - **User-Friendly UI**: Clean Gradio interface with real-time progress
 - **GGUF Quantization**: Optimized to fit in 12GB VRAM
-- **Advanced Controls**: Negative prompts, adjustable steps (4-12), aspect ratios
+- **Advanced Controls**: Adjustable steps (4-12), multiple aspect ratios
 - **Image History**: Gallery of last 12 generated images
 - **One-Click Download**: Save images with metadata filenames
 
@@ -184,13 +184,16 @@ This project officially supports:
 1. **Access the UI**: Open `http://localhost:7860` in your browser
 2. **Enter a prompt**: Describe the image you want (e.g., "a cat wearing a wizard hat")
 3. **Optional settings**:
-   - **✨ Enhance Prompt**: Enable AI-powered prompt expansion (~5-10s, downloads model on first use)
-   - **Negative Prompt**: Things to avoid (e.g., "blurry, ugly, distorted")
    - **Seed**: Use -1 for random, or a specific number for reproducibility
    - **Steps**: 4-12 (default 8) - more steps = better quality but slower
    - **Aspect Ratio**: Choose from 1:1, 3:4, 4:3, 16:9, 9:16
-4. **Generate**: Click the button and wait ~3 seconds (or ~10-15s with enhancement)
-5. **Download**: Click the download link to save the image
+4. **Generate or Enhance**:
+   - Click **🎨 Generate** to create an image immediately with your prompt
+   - Click **✨ Enhance** to get an AI-expanded version of your prompt (~5-10s)
+5. **If you enhanced**:
+   - Click **🎨 Generate with Enhanced** to use the expanded prompt
+   - Or click **📋 Copy to Prompt** to edit the enhanced text before generating
+6. **Download**: Click the download link to save the image
 
 ## Configuration
 
