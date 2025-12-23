@@ -108,13 +108,18 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
-### 4. Download Models
+### 4. Clone Repository
+
+```bash
+git clone https://github.com/binkiewka/z-image-turbo-local.git
+cd z-image-turbo-local
+```
+
+### 5. Download Models
 
 Create model directories and download the required files:
 
 ```bash
-cd image-gen
-
 # Create model directories
 mkdir -p models/diffusion_models models/text_encoders models/vae
 
@@ -149,7 +154,7 @@ ls -lh models/*/
 # vae/ae.safetensors                         ~335MB
 ```
 
-### 5. Build and Run
+### 6. Build and Run
 
 ```bash
 # Build containers
