@@ -388,7 +388,7 @@ If you see GPU information, you're ready to proceed to [Step 4](#step-4-clone-re
 - Windows filesystem via `/mnt/c`: 2-5x slower due to 9P protocol overhead
 - Model files are large (10GB+), and performance is critical
 
-**Recommended:** Work in your WSL2 home directory (`/home/yourusername/`).
+**Recommended:** Work in your WSL2 home directory (`~/` or `/home/<your-wsl-username>/`).
 
 ### 4.2 Navigate to Home Directory
 
@@ -401,19 +401,19 @@ cd ~/
 If you have the repository on GitHub:
 
 ```bash
-git clone https://github.com/yourusername/image-gen.git
-cd image-gen
+git clone https://github.com/binkiewka/z-image-turbo-local.git
+cd z-image-turbo-local
 ```
 
 If you're copying files from Windows:
 
 ```bash
 # Copy from Windows to WSL2 (one-time operation)
-cp -r /mnt/c/Users/YourName/Desktop/image-gen ~/image-gen
-cd ~/image-gen
+cp -r /mnt/c/Users/YourName/Desktop/z-image-turbo-local ~/z-image-turbo-local
+cd ~/z-image-turbo-local
 ```
 
-**After copying, always work from `~/image-gen`, NOT `/mnt/c/...`**
+**After copying, always work from `~/z-image-turbo-local`, NOT `/mnt/c/...`**
 
 ### 4.4 Create Model Directories
 
@@ -473,7 +473,7 @@ wget -O models/text_encoders/Qwen_3_4b-IQ4_XS.gguf \
 
 ```bash
 # Copy from Windows Downloads to WSL2 (adjust username)
-cp /mnt/c/Users/YOUR_WINDOWS_USERNAME/Downloads/ae.safetensors ~/image-gen/models/vae/
+cp /mnt/c/Users/YOUR_WINDOWS_USERNAME/Downloads/ae.safetensors ~/z-image-turbo-local/models/vae/
 ```
 
 > [!WARNING]
@@ -767,8 +767,8 @@ RuntimeError: No CUDA GPUs are available
 
    ```bash
    cd ~/
-   cp -r /mnt/c/Users/YourName/Desktop/image-gen ~/image-gen
-   cd ~/image-gen
+   cp -r /mnt/c/Users/YourName/Desktop/z-image-turbo-local ~/z-image-turbo-local
+   cd ~/z-image-turbo-local
    ```
 
 3. **Rebuild containers:**
@@ -906,7 +906,7 @@ ls -lh models/vae/ae.safetensors
    d. Copy from Windows Downloads to WSL2:
 
    ```bash
-   cp /mnt/c/Users/YOUR_USERNAME/Downloads/ae.safetensors ~/image-gen/models/vae/
+   cp /mnt/c/Users/YOUR_USERNAME/Downloads/ae.safetensors ~/z-image-turbo-local/models/vae/
    ```
 
 3. **Verify the file is real (~335MB):**
