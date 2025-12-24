@@ -252,31 +252,25 @@ def warmup_models():
 warmup_models()
 
 
-# Custom CSS for clean minimal dark theme
+# Custom CSS - keep structure, remove blue input fills
 custom_css = """
 /* Dark background */
 .gradio-container {
     background: #0f1419 !important;
 }
 
-/* Remove all colored backgrounds from containers - make them transparent */
-.container, .panel, .block, .form, .wrap, .gr-box, .gr-form, .gr-panel {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* Specific fix for Gradio blocks with backgrounds */
-div[class*="block"], div[class*="panel"], div[class*="form"] {
-    background: transparent !important;
-    border: none !important;
-}
-
-/* Clean input fields - dark with subtle border like Generated Image */
-textarea, input[type="text"], input[type="number"], .gr-text-input, .gr-box {
-    background: rgba(0, 0, 0, 0.4) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+/* Keep panel borders and structure - darker transparent background */
+.container, .panel, .block, .form, .wrap {
+    background: rgba(20, 30, 40, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
+}
+
+/* Input fields - dark transparent, NO blue fill */
+textarea, input[type="text"], input[type="number"] {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 6px !important;
     color: #e0e0e0 !important;
 }
 
@@ -285,88 +279,63 @@ textarea:focus, input:focus {
     outline: none !important;
 }
 
-/* Dropdowns - clean dark style */
+/* Dropdowns - dark transparent */
 select, .gr-dropdown {
-    background: rgba(0, 0, 0, 0.4) !important;
+    background: rgba(0, 0, 0, 0.3) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 8px !important;
     color: #e0e0e0 !important;
 }
 
-/* Slider - minimal */
+/* Slider */
 input[type="range"] {
     accent-color: #0ea5e9 !important;
 }
 
-/* Primary button - cyan gradient */
+/* Primary button - cyan */
 button.primary {
     background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
     border: none !important;
-    border-radius: 8px !important;
-    box-shadow: none !important;
-    transition: opacity 0.2s ease !important;
+    border-radius: 6px !important;
 }
 
 button.primary:hover {
     opacity: 0.9 !important;
 }
 
-/* Secondary button - subtle */
+/* Secondary button */
 button.secondary {
     background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 6px !important;
 }
 
 button.secondary:hover {
     background: rgba(255, 255, 255, 0.12) !important;
 }
 
-/* Labels - clean white text */
-label, .gr-label, span {
-    color: #e0e0e0 !important;
-}
-
-/* Image container - subtle dark border like Generated Image */
-.image-container, .gr-image, .output-image {
+/* Image container */
+.image-container, .gr-image {
     background: rgba(0, 0, 0, 0.3) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
     border-radius: 8px !important;
 }
 
-/* Gallery - clean */
+/* Gallery */
 .gallery {
-    background: transparent !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
 }
 
-.gallery .thumbnail-item {
-    border-radius: 6px !important;
-}
-
-/* Status textbox */
-.gr-textbox[readonly], textarea[readonly] {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-}
-
-/* Headers - cyan color */
+/* Headers - cyan */
 h1, h2, h3 {
     color: #0ea5e9 !important;
     background: none !important;
     -webkit-text-fill-color: #0ea5e9 !important;
 }
 
-/* Remove any colored group backgrounds */
-.gr-group, .gr-row, .gr-column {
-    background: transparent !important;
-    border: none !important;
-}
-
-/* Fix info text */
-.gr-info, .info {
-    color: #888 !important;
+/* Labels */
+label {
+    color: #e0e0e0 !important;
 }
 """
 
