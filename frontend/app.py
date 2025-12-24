@@ -11,7 +11,7 @@ import gradio as gr
 import httpx
 import websockets
 from PIL import Image
-from prompt_enhancer import enhance_prompt
+from prompt_enhancer import enhance_prompt, get_enhancer
 
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
 COMFYUI_PORT = os.environ.get("COMFYUI_PORT", "8188")
@@ -211,17 +211,13 @@ def generate_image(prompt: str, seed: int, steps: int, aspect_ratio: str, num_im
         return None, f"Error: {str(e)}", current_gallery
 
 
-def enhance_only(prompt, progress=gr.Progress()):
+def enhance_only(prompt):
     """Enhance prompt without generating image."""
     if not prompt or not prompt.strip():
         return "", "Please enter a prompt first", gr.update(visible=False)
 
-    progress(0, desc="Enhancing prompt...")
     try:
-        def status_callback(msg):
-            progress(0.5, desc=msg)
-        enhanced = enhance_prompt(prompt.strip(), status_callback)
-        progress(1, desc="Prompt enhanced!")
+        enhanced = enhance_prompt(prompt.strip())
         return enhanced, "✨ Prompt enhanced! Click 'Generate with Enhanced' or 'Copy to Prompt'", gr.update(visible=True)
     except Exception as e:
         return "", f"Enhancement failed: {e}", gr.update(visible=False)
@@ -250,6 +246,15 @@ def warmup_models():
 
 # Warmup models before starting Gradio
 warmup_models()
+
+# Pre-load the prompt enhancer model so it's ready on first use
+print("Pre-loading prompt enhancer model...")
+try:
+    enhancer = get_enhancer()
+    enhancer._load_model()
+    print("Prompt enhancer ready!")
+except Exception as e:
+    print(f"Prompt enhancer pre-load failed (will load on first use): {e}")
 
 
 # Custom CSS - keep structure, remove blue input fills
@@ -320,10 +325,35 @@ button.secondary:hover {
     border-radius: 8px !important;
 }
 
-/* Gallery */
-.gallery {
+/* Gallery - no internal scroll, flows with page */
+.gallery, .gr-gallery {
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
+    overflow: visible !important;
+}
+
+/* Gallery grid - consistent thumbnail sizing */
+.gr-gallery .grid-wrap {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 8px !important;
+    overflow: visible !important;
+}
+
+/* Gallery thumbnail containers */
+.gr-gallery .grid-wrap > div,
+.gr-gallery .thumbnail-item {
+    aspect-ratio: 1 !important;
+    height: auto !important;
+    max-height: 120px !important;
+    overflow: hidden !important;
+}
+
+/* Gallery images - consistent sizing */
+.gr-gallery .grid-wrap img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
 }
 
 /* Headers - cyan */
@@ -420,8 +450,8 @@ with gr.Blocks(
     gallery = gr.Gallery(
         label="Recent Generations",
         show_label=False,
-        columns=4,
-        object_fit="contain",
+        columns=6,
+        object_fit="cover",
         allow_preview=True
     )
 

@@ -70,14 +70,18 @@ class PromptEnhancer:
         model_path = self._ensure_model_downloaded()
         print("Loading Qwen2.5-1.5B-Instruct for prompt enhancement...")
         
+        # Get CPU thread count for optimal performance
+        import multiprocessing
+        cpu_threads = min(multiprocessing.cpu_count(), 8)  # Cap at 8 for efficiency
+        
         self._llm = Llama(
             model_path=str(model_path),
-            n_ctx=2048,       # Context window
-            n_threads=4,      # CPU threads
-            n_gpu_layers=0,   # CPU only - preserve GPU for image gen
+            n_ctx=1024,         # Reduced context - prompts don't need 2048
+            n_threads=cpu_threads,  # Use more CPU threads
+            n_gpu_layers=0,     # CPU only - preserve GPU for image gen
             verbose=False
         )
-        print("Enhancer model loaded!")
+        print(f"Enhancer model loaded! (using {cpu_threads} CPU threads)")
     
     def enhance(self, prompt: str, progress_callback=None) -> str:
         """
@@ -108,7 +112,7 @@ class PromptEnhancer:
             # Generate enhanced prompt
             response = self._llm.create_chat_completion(
                 messages=messages,
-                max_tokens=512,
+                max_tokens=256,      # Reduced from 512 for faster generation
                 temperature=0.7,
                 top_p=0.9,
             )
