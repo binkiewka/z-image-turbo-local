@@ -38,7 +38,7 @@ with open("workflow_api.json", "r") as f:
 gallery_history = []
 
 
-def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int) -> tuple[dict, int]:
+def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1) -> tuple[dict, int]:
     """Prepare the workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
 
@@ -56,9 +56,10 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
     # Steps
     workflow["10"]["inputs"]["steps"] = steps
 
-    # Resolution
+    # Resolution and batch size
     workflow["5"]["inputs"]["width"] = width
     workflow["5"]["inputs"]["height"] = height
+    workflow["5"]["inputs"]["batch_size"] = num_images
 
     return workflow, seed
 
@@ -117,7 +118,7 @@ async def submit_and_wait_with_progress(workflow: dict, client_id: str, progress
     raise Exception("Failed to connect to ComfyUI WebSocket after retries")
 
 
-async def get_history(prompt_id: str) -> tuple[str, str] | None:
+async def get_history(prompt_id: str) -> list[tuple[str, str]] | None:
     """Get the output image info from history."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(f"{COMFYUI_URL}/history/{prompt_id}")
@@ -128,8 +129,11 @@ async def get_history(prompt_id: str) -> tuple[str, str] | None:
             outputs = history[prompt_id].get("outputs", {})
             for node_id, node_output in outputs.items():
                 if "images" in node_output:
+                    # Return all images from batch
+                    images_info = []
                     for img in node_output["images"]:
-                        return img["filename"], img.get("subfolder", "")
+                        images_info.append((img["filename"], img.get("subfolder", "")))
+                    return images_info if images_info else None
     return None
 
 
@@ -145,21 +149,23 @@ async def fetch_image(filename: str, subfolder: str) -> Image.Image:
         return Image.open(BytesIO(response.content))
 
 
-def generate_image(prompt: str, seed: int, steps: int, aspect_ratio: str, current_gallery: list, progress=gr.Progress()):
+def generate_image(prompt: str, seed: int, steps: int, aspect_ratio: str, num_images: int, current_gallery: list, progress=gr.Progress()):
     """Main generation function with progress tracking."""
     global gallery_history
 
     if not prompt or not prompt.strip():
-        return None, "Please enter a prompt", None, current_gallery
+        return None, "Please enter a prompt", current_gallery
 
     actual_prompt = prompt.strip()
     width, height = ASPECT_RATIOS.get(aspect_ratio, (1024, 1024))
+    num_images = int(num_images)
     workflow, actual_seed = prepare_workflow(
         actual_prompt,
         int(seed),
         int(steps),
         width,
-        height
+        height,
+        num_images
     )
     client_id = str(uuid.uuid4())
 
@@ -180,24 +186,29 @@ def generate_image(prompt: str, seed: int, steps: int, aspect_ratio: str, curren
         result = asyncio.run(run_generation())
 
         if result:
-            filename, subfolder = result
-            image = asyncio.run(fetch_image(filename, subfolder))
-
-            # Save for download
-            download_path = DOWNLOAD_DIR / f"zimage_{actual_seed}_{int(time.time())}.png"
-            image.save(download_path)
-
-            # Update gallery
-            gallery_entry = (image, f"Seed: {actual_seed}")
-            gallery_history.insert(0, gallery_entry)
+            images = []
+            for i, (filename, subfolder) in enumerate(result):
+                image = asyncio.run(fetch_image(filename, subfolder))
+                
+                # Save for download
+                download_path = DOWNLOAD_DIR / f"zimage_{actual_seed}_{i}_{int(time.time())}.png"
+                image.save(download_path)
+                
+                images.append(image)
+                
+                # Update gallery
+                gallery_entry = (image, f"Seed: {actual_seed} ({i+1}/{num_images})")
+                gallery_history.insert(0, gallery_entry)
+            
             gallery_history = gallery_history[:12]  # Keep last 12
-
-            return image, f"Done! Seed: {actual_seed}", str(download_path), gallery_history
+            
+            # Return first image as main display
+            return images[0], f"Done! Seed: {actual_seed} ({num_images} image(s))", gallery_history
         else:
-            return None, "No image generated", None, current_gallery
+            return None, "No image generated", current_gallery
 
     except Exception as e:
-        return None, f"Error: {str(e)}", None, current_gallery
+        return None, f"Error: {str(e)}", current_gallery
 
 
 def enhance_only(prompt, progress=gr.Progress()):
@@ -225,7 +236,7 @@ def warmup_models():
     """Pre-load models by running a dummy generation at startup."""
     print("Warming up models... (this may take 10-30 seconds on first run)")
     try:
-        result = generate_image("warmup test", 42, 8, "1:1 (1024x1024)", [], gr.Progress())
+        result = generate_image("warmup test", 42, 8, "1:1 (1024x1024)", 1, [], gr.Progress())
         if result[0] is not None:
             print("Models loaded successfully!")
             # Clear the warmup image from gallery
@@ -241,9 +252,118 @@ def warmup_models():
 warmup_models()
 
 
-with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as demo:
-    gr.Markdown("# Z-Image-Turbo (Local)")
-    gr.Markdown("Generate images locally using Z-Image-Turbo on RTX 3060")
+# Custom CSS for modern glass look
+custom_css = """
+/* Modern gradient header */
+.gradio-container {
+    background: linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 50%, #1b263b 100%) !important;
+}
+
+/* Glass effect for containers */
+.container, .panel, .block {
+    backdrop-filter: blur(10px) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 16px !important;
+}
+
+/* Glowing primary button - cyan/blue */
+button.primary {
+    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+button.primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6) !important;
+}
+
+/* Secondary button style */
+button.secondary {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(14, 165, 233, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+button.secondary:hover {
+    background: rgba(14, 165, 233, 0.15) !important;
+    border-color: rgba(14, 165, 233, 0.5) !important;
+}
+
+/* Input fields styling */
+textarea, input[type="text"], input[type="number"] {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    transition: border-color 0.3s ease !important;
+}
+
+textarea:focus, input:focus {
+    border-color: #0ea5e9 !important;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.3) !important;
+}
+
+/* Gallery grid styling */
+.gallery {
+    border-radius: 16px !important;
+    overflow: hidden !important;
+}
+
+.gallery .thumbnail-item {
+    border-radius: 12px !important;
+    transition: transform 0.3s ease !important;
+}
+
+.gallery .thumbnail-item:hover {
+    transform: scale(1.05) !important;
+}
+
+/* Output image container */
+.image-container {
+    border-radius: 16px !important;
+    overflow: hidden !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Status bar */
+.status-bar {
+    background: rgba(14, 165, 233, 0.1) !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+}
+
+/* Slider styling */
+input[type="range"] {
+    accent-color: #0ea5e9 !important;
+}
+
+/* Dropdown styling */
+.dropdown {
+    border-radius: 12px !important;
+}
+
+/* Markdown headers - cyan gradient */
+h1, h2, h3 {
+    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+"""
+
+with gr.Blocks(
+    title="Z-Image-Turbo (Local)", 
+    theme=gr.themes.Glass(
+        primary_hue="cyan",
+        secondary_hue="sky",
+        neutral_hue="slate",
+    ),
+    css=custom_css
+) as demo:
+    gr.Markdown("# ✨ Z-Image-Turbo")
+    gr.Markdown("*Generate stunning images locally with AI-powered turbo mode*")
 
     with gr.Row():
         with gr.Column(scale=1):
@@ -268,6 +388,10 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 copy_prompt_btn = gr.Button("📋 Copy to Prompt", variant="secondary")
 
             with gr.Row():
+                generate_btn = gr.Button("🎨 Generate", variant="primary", size="lg")
+                enhance_btn = gr.Button("✨ Enhance", variant="secondary", size="lg")
+
+            with gr.Row():
                 seed = gr.Number(
                     label="Seed",
                     value=-1,
@@ -280,19 +404,21 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                     value="1:1 (1024x1024)"
                 )
 
-            steps = gr.Slider(
-                label="Steps",
-                minimum=4,
-                maximum=12,
-                value=8,
-                step=1,
-                info="More steps = better quality, slower"
-            )
-
             with gr.Row():
-                generate_btn = gr.Button("🎨 Generate", variant="primary", size="lg")
-                enhance_btn = gr.Button("✨ Enhance", variant="secondary", size="lg")
-            status = gr.Textbox(label="Status", interactive=False)
+                steps = gr.Slider(
+                    label="Steps",
+                    minimum=4,
+                    maximum=12,
+                    value=8,
+                    step=1,
+                    info="More steps = better quality, slower"
+                )
+                num_images = gr.Dropdown(
+                    label="Number of Images",
+                    choices=[1, 2, 3, 4],
+                    value=1,
+                    info="Generate up to 4 variants"
+                )
 
         with gr.Column(scale=1):
             output_image = gr.Image(
@@ -301,14 +427,10 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
                 height=512
             )
 
-            download_file = gr.File(
-                label="Download",
-                visible=True,
-                interactive=False
-            )
+            status = gr.Textbox(label="Status", interactive=False)
 
     # Gallery section
-    gr.Markdown("### History")
+    gr.Markdown("### 🖼️ Recent Generations")
     gallery = gr.Gallery(
         label="Recent Generations",
         show_label=False,
@@ -323,15 +445,15 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
     # Generate button click - uses original prompt
     generate_btn.click(
         fn=generate_image,
-        inputs=[prompt, seed, steps, aspect_ratio, gallery_state],
-        outputs=[output_image, status, download_file, gallery]
+        inputs=[prompt, seed, steps, aspect_ratio, num_images, gallery_state],
+        outputs=[output_image, status, gallery]
     )
 
     # Enter key in prompt - uses original prompt
     prompt.submit(
         fn=generate_image,
-        inputs=[prompt, seed, steps, aspect_ratio, gallery_state],
-        outputs=[output_image, status, download_file, gallery]
+        inputs=[prompt, seed, steps, aspect_ratio, num_images, gallery_state],
+        outputs=[output_image, status, gallery]
     )
 
     # Enhance button click - only enhances, no generation
@@ -344,8 +466,8 @@ with gr.Blocks(title="Z-Image-Turbo (Local)", theme=gr.themes.Monochrome()) as d
     # Generate with enhanced prompt
     generate_enhanced_btn.click(
         fn=generate_image,
-        inputs=[enhanced_prompt_output, seed, steps, aspect_ratio, gallery_state],
-        outputs=[output_image, status, download_file, gallery]
+        inputs=[enhanced_prompt_output, seed, steps, aspect_ratio, num_images, gallery_state],
+        outputs=[output_image, status, gallery]
     )
 
     # Copy enhanced prompt to main prompt field
