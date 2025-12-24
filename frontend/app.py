@@ -252,104 +252,121 @@ def warmup_models():
 warmup_models()
 
 
-# Custom CSS for modern glass look
+# Custom CSS for clean minimal dark theme
 custom_css = """
-/* Modern gradient header */
+/* Dark background */
 .gradio-container {
-    background: linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 50%, #1b263b 100%) !important;
+    background: #0f1419 !important;
 }
 
-/* Glass effect for containers */
-.container, .panel, .block {
-    backdrop-filter: blur(10px) !important;
-    background: rgba(255, 255, 255, 0.03) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 16px !important;
-}
-
-/* Glowing primary button - cyan/blue */
-button.primary {
-    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
+/* Remove all colored backgrounds from containers - make them transparent */
+.container, .panel, .block, .form, .wrap, .gr-box, .gr-form, .gr-panel {
+    background: transparent !important;
     border: none !important;
-    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4) !important;
-    transition: all 0.3s ease !important;
+    box-shadow: none !important;
 }
 
-button.primary:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6) !important;
+/* Specific fix for Gradio blocks with backgrounds */
+div[class*="block"], div[class*="panel"], div[class*="form"] {
+    background: transparent !important;
+    border: none !important;
 }
 
-/* Secondary button style */
-button.secondary {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(14, 165, 233, 0.3) !important;
-    transition: all 0.3s ease !important;
-}
-
-button.secondary:hover {
-    background: rgba(14, 165, 233, 0.15) !important;
-    border-color: rgba(14, 165, 233, 0.5) !important;
-}
-
-/* Input fields styling */
-textarea, input[type="text"], input[type="number"] {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 12px !important;
-    transition: border-color 0.3s ease !important;
+/* Clean input fields - dark with subtle border like Generated Image */
+textarea, input[type="text"], input[type="number"], .gr-text-input, .gr-box {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+    color: #e0e0e0 !important;
 }
 
 textarea:focus, input:focus {
     border-color: #0ea5e9 !important;
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.3) !important;
+    outline: none !important;
 }
 
-/* Gallery grid styling */
-.gallery {
-    border-radius: 16px !important;
-    overflow: hidden !important;
+/* Dropdowns - clean dark style */
+select, .gr-dropdown {
+    background: rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+    color: #e0e0e0 !important;
 }
 
-.gallery .thumbnail-item {
-    border-radius: 12px !important;
-    transition: transform 0.3s ease !important;
-}
-
-.gallery .thumbnail-item:hover {
-    transform: scale(1.05) !important;
-}
-
-/* Output image container */
-.image-container {
-    border-radius: 16px !important;
-    overflow: hidden !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Status bar */
-.status-bar {
-    background: rgba(14, 165, 233, 0.1) !important;
-    border-radius: 12px !important;
-    padding: 12px !important;
-}
-
-/* Slider styling */
+/* Slider - minimal */
 input[type="range"] {
     accent-color: #0ea5e9 !important;
 }
 
-/* Dropdown styling */
-.dropdown {
-    border-radius: 12px !important;
+/* Primary button - cyan gradient */
+button.primary {
+    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    transition: opacity 0.2s ease !important;
 }
 
-/* Markdown headers - cyan gradient */
+button.primary:hover {
+    opacity: 0.9 !important;
+}
+
+/* Secondary button - subtle */
+button.secondary {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+}
+
+button.secondary:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Labels - clean white text */
+label, .gr-label, span {
+    color: #e0e0e0 !important;
+}
+
+/* Image container - subtle dark border like Generated Image */
+.image-container, .gr-image, .output-image {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+}
+
+/* Gallery - clean */
+.gallery {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 8px !important;
+}
+
+.gallery .thumbnail-item {
+    border-radius: 6px !important;
+}
+
+/* Status textbox */
+.gr-textbox[readonly], textarea[readonly] {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Headers - cyan color */
 h1, h2, h3 {
-    background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
+    color: #0ea5e9 !important;
+    background: none !important;
+    -webkit-text-fill-color: #0ea5e9 !important;
+}
+
+/* Remove any colored group backgrounds */
+.gr-group, .gr-row, .gr-column {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Fix info text */
+.gr-info, .info {
+    color: #888 !important;
 }
 """
 
