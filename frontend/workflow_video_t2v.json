@@ -1,0 +1,157 @@
+{
+  "1": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {"title": "Load CLIP (UMT5)"}
+  },
+  "2": {
+    "inputs": {
+      "unet_name": "MODEL_HIGH_PLACEHOLDER"
+    },
+    "class_type": "UnetLoaderGGUF",
+    "_meta": {"title": "Load Unet High Noise (GGUF)"}
+  },
+  "3": {
+    "inputs": {
+      "unet_name": "MODEL_LOW_PLACEHOLDER"
+    },
+    "class_type": "UnetLoaderGGUF",
+    "_meta": {"title": "Load Unet Low Noise (GGUF)"}
+  },
+  "4": {
+    "inputs": {
+      "lora_name": "LORA_HIGH_PLACEHOLDER",
+      "strength_model": 1.0,
+      "model": ["2", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA High Noise"}
+  },
+  "5": {
+    "inputs": {
+      "lora_name": "LORA_LOW_PLACEHOLDER",
+      "strength_model": 1.0,
+      "model": ["3", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA Low Noise"}
+  },
+  "6": {
+    "inputs": {
+      "blocks_to_swap": 40,
+      "offload_img_emb": false,
+      "offload_txt_emb": false,
+      "use_non_blocking": false,
+      "model": ["4", 0]
+    },
+    "class_type": "wanBlockSwap",
+    "_meta": {"title": "wanBlockSwap High Pass"}
+  },
+  "7": {
+    "inputs": {
+      "blocks_to_swap": 40,
+      "offload_img_emb": false,
+      "offload_txt_emb": false,
+      "use_non_blocking": true,
+      "model": ["5", 0]
+    },
+    "class_type": "wanBlockSwap",
+    "_meta": {"title": "wanBlockSwap Low Pass"}
+  },
+  "8": {
+    "inputs": {
+      "text": "PROMPT_PLACEHOLDER",
+      "clip": ["1", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}
+  },
+  "9": {
+    "inputs": {
+      "text": "",
+      "clip": ["1", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Negative Prompt)"}
+  },
+  "10": {
+    "inputs": {
+      "width": 848,
+      "height": 480,
+      "length": 81,
+      "batch_size": 1
+    },
+    "class_type": "EmptyHunyuanLatentVideo",
+    "_meta": {"title": "Empty Latent Video"}
+  },
+  "11": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "sgm_uniform",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "enable",
+      "model": ["6", 0],
+      "positive": ["8", 0],
+      "negative": ["9", 0],
+      "latent_image": ["10", 0]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {"title": "KSampler High Noise Pass"}
+  },
+  "12": {
+    "inputs": {
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "sgm_uniform",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": ["7", 0],
+      "positive": ["8", 0],
+      "negative": ["9", 0],
+      "latent_image": ["11", 0]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {"title": "KSampler Low Noise Pass"}
+  },
+  "13": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {"title": "Load VAE"}
+  },
+  "14": {
+    "inputs": {
+      "samples": ["12", 0],
+      "vae": ["13", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {"title": "VAE Decode"}
+  },
+  "15": {
+    "inputs": {
+      "frame_rate": 16,
+      "loop_count": 0,
+      "filename_prefix": "wan2_t2v",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 10,
+      "save_metadata": true,
+      "images": ["14", 0]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {"title": "Video Combine"}
+  }
+}

@@ -3,7 +3,7 @@ FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# Install system dependencies including ffmpeg for video encoding
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     libsm6 \
     libxext6 \
     libxrender-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -34,6 +35,35 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 WORKDIR /app/ComfyUI/custom_nodes
 RUN git clone https://github.com/city96/ComfyUI-GGUF.git
 RUN pip3 install --no-cache-dir -r ComfyUI-GGUF/requirements.txt
+
+# ============================================
+# WAN 2.2 Video Generation Custom Nodes
+# ============================================
+
+# Video Helper Suite (VHS_VideoCombine for MP4 output)
+RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
+    pip3 install --no-cache-dir -r ComfyUI-VideoHelperSuite/requirements.txt
+
+# Frame Interpolation (RIFE VFI for smoother video)
+RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git && \
+    pip3 install --no-cache-dir -r ComfyUI-Frame-Interpolation/requirements.txt
+
+# wanBlockSwap (CRITICAL for 12GB VRAM - enables block swapping to reduce memory)
+RUN git clone https://github.com/city96/wanBlockSwap.git
+
+# KJNodes (utility nodes including PathchSageAttentionKJ)
+RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
+    pip3 install --no-cache-dir -r ComfyUI-KJNodes/requirements.txt
+
+# rgthree-comfy (Any Switch nodes for model routing)
+RUN git clone https://github.com/rgthree/rgthree-comfy.git && \
+    pip3 install --no-cache-dir -r rgthree-comfy/requirements.txt
+
+# ComfyUI-Various (JW nodes for image resize, math operations)
+RUN git clone https://github.com/jamesWalker55/comfyui-various.git
+
+# ComfyUI-Custom-Scripts (MathExpression node)
+RUN git clone https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git
 
 # Return to ComfyUI root
 WORKDIR /app/ComfyUI
