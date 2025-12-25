@@ -5,6 +5,7 @@ import random
 import asyncio
 import time
 import shutil
+import gc
 from io import BytesIO
 from pathlib import Path
 
@@ -465,6 +466,30 @@ async def fetch_video(filename: str, subfolder: str) -> bytes:
         return response.content
 
 
+async def free_comfyui_memory():
+    """Call ComfyUI's /free API to release GPU/RAM memory after generation.
+    
+    This is critical for video generation which loads large models that
+    would otherwise stay in memory and cause OOM on subsequent generations.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Call the /free endpoint to unload models and free memory
+            response = await client.post(
+                f"{COMFYUI_URL}/free",
+                json={"unload_models": True, "free_memory": True}
+            )
+            if response.status_code == 200:
+                print("ComfyUI memory freed successfully")
+            else:
+                print(f"Warning: /free returned status {response.status_code}")
+    except Exception as e:
+        print(f"Warning: Failed to free ComfyUI memory: {e}")
+    
+    # Also run Python garbage collection
+    gc.collect()
+
+
 def upload_image_to_comfyui(image_path: str) -> str:
     """Upload an image to ComfyUI input folder and return filename."""
     import httpx
@@ -567,6 +592,11 @@ def generate_video(
         return None, f"Timeout: {str(e)}"
     except Exception as e:
         return None, f"Error: {str(e)}"
+    finally:
+        # CRITICAL: Free memory after video generation to prevent RAM buildup
+        # Video models are very large and will cause OOM if not unloaded
+        print("Cleaning up video generation memory...")
+        asyncio.run(free_comfyui_memory())
 
 
 def copy_to_prompt(enhanced_text):
