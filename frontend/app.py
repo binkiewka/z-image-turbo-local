@@ -118,6 +118,61 @@ def scan_video_models():
     return models
 
 
+def scan_enhancement_models():
+    """Scan for available RIFE VFI and Upscale models."""
+    models = {
+        "vfi": [],
+        "upscale": []
+    }
+
+    try:
+        import httpx
+        # Scan for RIFE VFI models
+        response = httpx.get(f"{COMFYUI_URL}/object_info/RIFE VFI", timeout=5.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "RIFE VFI" in data:
+                 input_req = data["RIFE VFI"]["input"]["required"]
+                 # RIFE VFI uses "ckpt_name" which is a list of strings
+                 if "ckpt_name" in input_req:
+                     ckpt_list = input_req["ckpt_name"][0]
+                     if isinstance(ckpt_list, list):
+                         models["vfi"] = ckpt_list
+        else:
+            print(f"Debug: RIFE VFI scan failed with status {response.status_code}")
+
+        # Scan for Upscale models
+        response = httpx.get(f"{COMFYUI_URL}/object_info/UpscaleModelLoader", timeout=5.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "UpscaleModelLoader" in data:
+                input_req = data["UpscaleModelLoader"]["input"]["required"]
+                if "model_name" in input_req:
+                    # ComfyUI sometimes returns ["COMBO", {"options": [...]}] for custom widgets
+                    # or just a list of strings
+                    model_data = input_req["model_name"][0]
+                    if isinstance(model_data, list):
+                        # Simple list
+                        models["upscale"] = model_data
+                    elif isinstance(model_data, str) and model_data == "COMBO":
+                        # COMBO type with options
+                         if len(input_req["model_name"]) > 1:
+                             options_dict = input_req["model_name"][1]
+                             if isinstance(options_dict, dict) and "options" in options_dict:
+                                 models["upscale"] = options_dict["options"]
+        else:
+            print(f"Debug: UpscaleModelLoader scan failed with status {response.status_code}")
+            
+        print(f"Debug: Scanned models: VFI={len(models['vfi'])}, Upscale={len(models['upscale'])}")
+        print(f"Debug: Upscale models found: {models['upscale']}")
+        print(f"Debug: VFI models found: {models['vfi']}")
+
+    except Exception as e:
+        print(f"Error scanning enhancement models: {e}")
+
+    return models
+
+
 def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1) -> tuple[dict, int]:
     """Prepare the workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
@@ -324,7 +379,12 @@ def prepare_video_workflow(
     model_low: str,
     lora_high: str,
     lora_low: str,
-    input_image: str = None
+    input_image: str = None,
+    upscale_enabled: bool = False,
+    upscale_model: str = None,
+    interpolate_enabled: bool = False,
+    interpolate_model: str = None,
+    interpolate_multiplier: int = 2
 ) -> tuple[dict, int]:
     """Prepare the video workflow with user inputs."""
     if mode == "Text to Video":
@@ -365,6 +425,58 @@ def prepare_video_workflow(
         # Set input image
         if input_image:
             workflow["10"]["inputs"]["image"] = input_image
+
+    # ============================
+    # Upscaling & Interpolation
+    # ============================
+    
+    # Start chain from VAE Decode (Node 14)
+    current_image_node = ["14", 0]
+    
+    # 1. Image Upscale
+    if upscale_enabled and upscale_model:
+        print(f"Adding Upscale node with model: {upscale_model}")
+        workflow["100"] = {
+            "inputs": {"model_name": upscale_model},
+            "class_type": "UpscaleModelLoader",
+            "_meta": {"title": "Load Upscale Model"}
+        }
+        workflow["101"] = {
+            "inputs": {
+                "upscale_model": ["100", 0],
+                "image": current_image_node
+            },
+            "class_type": "ImageUpscaleWithModel",
+            "_meta": {"title": "Upscale Image"}
+        }
+        current_image_node = ["101", 0]
+
+    # 2. Frame Interpolation (RIFE)
+    if interpolate_enabled and interpolate_model:
+        print(f"Adding RIFE node with model: {interpolate_model}, multiplier: {interpolate_multiplier}")
+        # Note: ComfyUI-Frame-Interpolation RIFE VFI node
+        workflow["102"] = {
+            "inputs": {
+                "model_name": interpolate_model,
+                "ckpt_name": interpolate_model, # Some versions use ckpt_name, some model_name. Safest to keep both or check? Usually 'model_name' if listed from 'vfi'. 
+                # Let's check standard node inputs. Often it is 'model_name' for 'RIFE VFI'.
+                # But wait, looking at standard node definition: RIFE VFI -> inputs: ckpt_name (vfi_models)
+                # I will use 'ckpt_name' as that's common for VFI. If it fails, I might need to adjust.
+                "ckpt_name": interpolate_model,
+                "clear_cache_after_n_frames": 10,
+                "multiplier": int(interpolate_multiplier),
+                "fast_mode": True,
+                "ensemble": True,
+                "scale_factor": 1.0,
+                "frames": current_image_node
+            },
+            "class_type": "RIFE VFI",
+            "_meta": {"title": "RIFE Frame Interpolation"}
+        }
+        current_image_node = ["102", 0]
+
+    # Link final image to Video Combine
+    workflow["15"]["inputs"]["images"] = current_image_node
 
     return workflow, seed
 
@@ -513,6 +625,11 @@ def generate_video(
     lora_high: str,
     lora_low: str,
     input_image=None,
+    upscale_enabled=False,
+    upscale_model=None,
+    interpolate_enabled=False,
+    interpolate_model=None,
+    interpolate_multiplier=2,
     progress=gr.Progress()
 ):
     """Main video generation function."""
@@ -551,7 +668,12 @@ def generate_video(
         model_low=model_low,
         lora_high=lora_high,
         lora_low=lora_low,
-        input_image=uploaded_image_name
+        input_image=uploaded_image_name,
+        upscale_enabled=upscale_enabled,
+        upscale_model=upscale_model,
+        interpolate_enabled=interpolate_enabled,
+        interpolate_model=interpolate_model,
+        interpolate_multiplier=int(interpolate_multiplier)
     )
     client_id = str(uuid.uuid4())
 
@@ -742,17 +864,24 @@ label {
 def refresh_video_models():
     """Refresh video model lists from ComfyUI - combines T2V and I2V models for user choice."""
     models = scan_video_models()
+    enhancement_models = scan_enhancement_models()
+    
     # Combine T2V and I2V models into single lists for user to choose any model
     all_high_models = sorted(set(models["t2v_high"] + models["i2v_high"]))
     all_low_models = sorted(set(models["t2v_low"] + models["i2v_low"]))
     all_high_loras = sorted(set(models["loras_high"]))
     all_low_loras = sorted(set(models["loras_low"]))
+    
+    all_upscale_models = sorted(set(enhancement_models["upscale"]))
+    all_vfi_models = sorted(set(enhancement_models["vfi"]))
 
     return (
         gr.update(choices=all_high_models, value=all_high_models[0] if all_high_models else None),
         gr.update(choices=all_low_models, value=all_low_models[0] if all_low_models else None),
         gr.update(choices=all_high_loras, value=all_high_loras[0] if all_high_loras else None),
         gr.update(choices=all_low_loras, value=all_low_loras[0] if all_low_loras else None),
+        gr.update(choices=all_upscale_models, value=all_upscale_models[0] if all_upscale_models else None),
+        gr.update(choices=all_vfi_models, value=all_vfi_models[0] if all_vfi_models else None),
     )
 
 
@@ -975,6 +1104,17 @@ with gr.Blocks(
                         info="81 frames = ~5 seconds at 16fps"
                     )
 
+                    with gr.Accordion("Enhancement (Upscale & Smoothness)", open=False):
+                        with gr.Row():
+                            with gr.Column():
+                                upscale_enabled = gr.Checkbox(label="Enable Upscaling", value=False)
+                                upscale_model = gr.Dropdown(label="Upscale Model", choices=[], interactive=True)
+                            
+                            with gr.Column():
+                                interpolate_enabled = gr.Checkbox(label="Enable RIFE Interpolation", value=False)
+                                interpolate_model = gr.Dropdown(label="Interpolation Model", choices=[], interactive=True)
+                                interpolate_multiplier = gr.Slider(label="Multiplier", minimum=2, maximum=4, step=1, value=2, info="2x = 2x framerate")
+
                     generate_video_btn = gr.Button("🎬 Generate Video", variant="primary", size="lg")
 
                 with gr.Column(scale=1):
@@ -996,7 +1136,7 @@ with gr.Blocks(
             refresh_models_btn.click(
                 fn=refresh_video_models,
                 inputs=[],
-                outputs=[video_model_high, video_model_low, video_lora_high, video_lora_low]
+                outputs=[video_model_high, video_model_low, video_lora_high, video_lora_low, upscale_model, interpolate_model]
             )
 
             # Generate video button
@@ -1012,7 +1152,12 @@ with gr.Blocks(
                     video_model_low,
                     video_lora_high,
                     video_lora_low,
-                    video_input_image
+                    video_input_image,
+                    upscale_enabled,
+                    upscale_model,
+                    interpolate_enabled,
+                    interpolate_model,
+                    interpolate_multiplier
                 ],
                 outputs=[output_video, video_status]
             )

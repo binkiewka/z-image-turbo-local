@@ -12,19 +12,24 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 ## Features
 
 ### Image Generation (Z-Image-Turbo)
+
 - **Fast Generation**: ~3 seconds per image with 8-step distilled model
 - **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-1.5B (runs on CPU, non-blocking)
 - **Advanced Controls**: Adjustable steps (4-12), multiple aspect ratios
 - **Image History**: Gallery of last 12 generated images
 
 ### Video Generation (WAN 2.2)
+
 - **Text-to-Video (T2V)**: Generate videos from text prompts
 - **Image-to-Video (I2V)**: Animate images into videos
 - **4-Step Lightning LoRAs**: Fast generation with distilled models
 - **VRAM Optimized**: wanBlockSwap enables 14B parameter models on 12GB VRAM
 - **User Model Selection**: Choose any downloaded model from dropdown menus
+- **AI Upscaling**: Up to 4x resolution using RealESRGAN
+- **Frame Interpolation (RIFE)**: Smooth 2x/4x framerate enhancement for fluid motion
 
 ### General
+
 - **Local Deployment**: Complete privacy, runs entirely on your hardware
 - **User-Friendly UI**: Clean Gradio interface with tabbed layout
 - **GGUF Quantization**: Optimized to fit in 12GB VRAM
@@ -61,6 +66,8 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 │  - UMT5 XXL Text Encoder FP8 (6.7GB)                    │
 │  - WAN 2.1 VAE (254MB)                                  │
 │  - Lightning LoRAs for 4-step generation                │
+│  - RealESRGAN Upscalers                                 │
+│  - RIFE Interpolation Models                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -140,7 +147,7 @@ Create model directories and download the required files:
 
 ```bash
 # Create model directories
-mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler
+mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler models/vfi
 ```
 
 #### Image Generation Models (Required)
@@ -196,6 +203,19 @@ wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
   "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
   "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+
+#### Improvement Models (Optional)
+
+```bash
+# RealESRGAN x2 Upscaler
+wget -O models/upscaler/RealESRGAN_x2.pth \
+  "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x2.pth"
+
+# RIFE v4.7 for Frame Interpolation
+wget -O models/vfi/rife47.pth \
+  "https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife47.pth"
+```
+
 ```
 
 **Verify downloads (important!):**
@@ -263,7 +283,10 @@ This project officially supports:
 7. **Settings**:
    - **Resolution**: 480p recommended for 12GB VRAM
    - **Frames**: 81 frames = ~5 seconds at 16fps
-8. **Click "🎬 Generate Video"**: Takes ~15-20 minutes
+8. **Enhancement (Optional)**:
+   - **Upscaling**: Enable to double resolution (e.g., 480p -> 960p)
+   - **Interpolation**: Enable RIFE to smoother motion (e.g., 16fps -> 32fps)
+9. **Click "🎬 Generate Video"**: Takes ~15-20 minutes
 
 > **Note**: Video generation requires both High Noise and Low Noise models with matching LoRAs. The two-pass approach (high noise → low noise) produces better quality.
 
@@ -396,11 +419,13 @@ docker compose logs -f comfyui   # Backend only
 ## Credits
 
 ### Image Generation
+
 - **Z-Image-Turbo**: [Tongyi-MAI/Alibaba](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
 - **Flux VAE**: [Black Forest Labs](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
 - **Qwen 3**: [Qwen Team](https://github.com/QwenLM/Qwen)
 
 ### Video Generation
+
 - **WAN 2.2**: [Wan-Video](https://github.com/Wan-Video/Wan2.1)
 - **WAN 2.2 GGUF**: [city96](https://huggingface.co/city96/wan2.2-t2v-14B-gguf)
 - **Lightning LoRAs**: [Kijai](https://huggingface.co/Kijai/WanVideo_comfy)
@@ -408,6 +433,7 @@ docker compose logs -f comfyui   # Backend only
 - **VideoHelperSuite**: [Kosinkadink](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
 ### Infrastructure
+
 - **ComfyUI**: [comfyanonymous](https://github.com/comfyanonymous/ComfyUI)
 - **ComfyUI-GGUF**: [city96](https://github.com/city96/ComfyUI-GGUF)
 

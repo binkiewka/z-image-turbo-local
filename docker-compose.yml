@@ -13,6 +13,8 @@ services:
       - ./models/vae:/app/ComfyUI/models/vae
       - ./models/loras:/app/ComfyUI/models/loras
       - ./models/upscaler:/app/ComfyUI/models/upscale_models
+      - ./models/vfi:/app/ComfyUI/models/vfi
+      - ./models/vfi:/app/ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts
       - ./output:/app/ComfyUI/output
       - ./input:/app/ComfyUI/input
     ports:
