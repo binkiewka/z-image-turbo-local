@@ -44,12 +44,12 @@ RUN pip3 install --no-cache-dir -r ComfyUI-GGUF/requirements.txt
 RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
     pip3 install --no-cache-dir -r ComfyUI-VideoHelperSuite/requirements.txt
 
-# Frame Interpolation (RIFE VFI for smoother video)
-RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git && \
-    pip3 install --no-cache-dir -r ComfyUI-Frame-Interpolation/requirements.txt
+# Frame Interpolation (RIFE VFI for smoother video) - optional, no requirements.txt
+RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git
 
-# wanBlockSwap (CRITICAL for 12GB VRAM - enables block swapping to reduce memory)
-RUN git clone https://github.com/city96/wanBlockSwap.git
+# ComfyUI-WanVideoWrapper (CRITICAL for 12GB VRAM - handles WAN 2.2 T2V/I2V with built-in block swap)
+RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
+    pip3 install --no-cache-dir -r ComfyUI-WanVideoWrapper/requirements.txt
 
 # KJNodes (utility nodes including PathchSageAttentionKJ)
 RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
@@ -57,10 +57,11 @@ RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
 
 # rgthree-comfy (Any Switch nodes for model routing)
 RUN git clone https://github.com/rgthree/rgthree-comfy.git && \
-    pip3 install --no-cache-dir -r rgthree-comfy/requirements.txt
+    if [ -f rgthree-comfy/requirements.txt ]; then pip3 install --no-cache-dir -r rgthree-comfy/requirements.txt; fi
 
 # ComfyUI-Various (JW nodes for image resize, math operations)
-RUN git clone https://github.com/jamesWalker55/comfyui-various.git
+RUN git clone https://github.com/jamesWalker55/comfyui-various.git && \
+    pip3 install --no-cache-dir soundfile
 
 # ComfyUI-Custom-Scripts (MathExpression node)
 RUN git clone https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git

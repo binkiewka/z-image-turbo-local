@@ -39,28 +39,6 @@
     "class_type": "LoraLoaderModelOnly",
     "_meta": {"title": "Load LoRA Low Noise"}
   },
-  "6": {
-    "inputs": {
-      "blocks_to_swap": 40,
-      "offload_img_emb": false,
-      "offload_txt_emb": false,
-      "use_non_blocking": false,
-      "model": ["4", 0]
-    },
-    "class_type": "wanBlockSwap",
-    "_meta": {"title": "wanBlockSwap High Pass"}
-  },
-  "7": {
-    "inputs": {
-      "blocks_to_swap": 40,
-      "offload_img_emb": false,
-      "offload_txt_emb": false,
-      "use_non_blocking": true,
-      "model": ["5", 0]
-    },
-    "class_type": "wanBlockSwap",
-    "_meta": {"title": "wanBlockSwap Low Pass"}
-  },
   "8": {
     "inputs": {
       "text": "PROMPT_PLACEHOLDER",
@@ -117,7 +95,7 @@
       "start_at_step": 0,
       "end_at_step": 2,
       "return_with_leftover_noise": "enable",
-      "model": ["6", 0],
+      "model": ["4", 0],
       "positive": ["12", 0],
       "negative": ["12", 1],
       "latent_image": ["12", 2]
@@ -136,7 +114,7 @@
       "start_at_step": 2,
       "end_at_step": 10000,
       "return_with_leftover_noise": "disable",
-      "model": ["7", 0],
+      "model": ["5", 0],
       "positive": ["12", 0],
       "negative": ["12", 1],
       "latent_image": ["13", 0]
@@ -161,6 +139,8 @@
       "pix_fmt": "yuv420p",
       "crf": 10,
       "save_metadata": true,
+      "pingpong": false,
+      "save_output": true,
       "images": ["15", 0]
     },
     "class_type": "VHS_VideoCombine",
