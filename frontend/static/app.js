@@ -31,6 +31,7 @@ function app() {
         videoPrompt: '',
         currentVideo: null,
         isGeneratingVideo: false,
+        isEnhancingVideo: false,
         videoProgress: 0,
         videoProgressText: 'Starting...',
         videoStatusMessage: '',
@@ -218,6 +219,40 @@ function app() {
                 this.showToast(error.message, 'error');
             } finally {
                 this.isEnhancing = false;
+            }
+        },
+
+        /**
+         * Enhance the video prompt using LLM (WAN 2.2 optimized)
+         */
+        async enhanceVideoPrompt() {
+            if (!this.videoPrompt.trim()) {
+                this.showToast('Please enter a prompt first', 'error');
+                return;
+            }
+
+            this.isEnhancingVideo = true;
+
+            try {
+                const response = await fetch('/api/enhance-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: this.videoPrompt })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.videoPrompt = data.enhanced;
+                    this.showToast('Video prompt enhanced!');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Enhancement failed');
+                }
+            } catch (error) {
+                console.error('Video enhancement error:', error);
+                this.showToast(error.message, 'error');
+            } finally {
+                this.isEnhancingVideo = false;
             }
         },
 

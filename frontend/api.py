@@ -24,7 +24,7 @@ import httpx
 import websockets
 from PIL import Image
 
-from prompt_enhancer import enhance_prompt, get_enhancer
+from prompt_enhancer import enhance_prompt, enhance_video_prompt, get_enhancer
 
 # ComfyUI connection settings
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
@@ -497,6 +497,19 @@ async def enhance_prompt_endpoint(request: EnhanceRequest):
         return {"original": request.prompt, "enhanced": enhanced}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Enhancement failed: {str(e)}")
+
+
+@app.post("/api/enhance-video")
+async def enhance_video_prompt_endpoint(request: EnhanceRequest):
+    """Enhance a video prompt for WAN 2.2 using the LLM."""
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+    try:
+        enhanced = enhance_video_prompt(request.prompt.strip())
+        return {"original": request.prompt, "enhanced": enhanced}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Video enhancement failed: {str(e)}")
 
 
 @app.post("/api/generate")
