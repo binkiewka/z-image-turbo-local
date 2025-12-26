@@ -494,6 +494,34 @@ def prepare_video_workflow(
     # Link final image to Video Combine
     workflow[combine_node_id]["inputs"]["images"] = current_image_node
 
+    # ============================
+    # 3. Extract and Save Last Frame
+    # ============================
+    # Use GetImageRangeFromBatch (KJNodes) to get the last frame
+    # start_index = -1 gets the last 'num_frames'
+    
+    # Node 103: GetImageRangeFromBatch
+    workflow["103"] = {
+        "inputs": {
+            "images": current_image_node,
+            "start_index": -1,
+            "num_frames": 1
+        },
+        "class_type": "GetImageRangeFromBatch",
+        "_meta": {"title": "Get Last Frame"}
+    }
+    
+    # Node 104: SaveImage
+    workflow["104"] = {
+        "inputs": {
+            "filename_prefix": "wan2_lastframe",
+            "images": ["103", 0],
+            "save_output": True
+        },
+        "class_type": "SaveImage",
+        "_meta": {"title": "Save Last Frame"}
+    }
+
     return workflow, seed
 
 
@@ -518,12 +546,12 @@ async def submit_and_wait_video(workflow: dict, client_id: str, progress_callbac
                 close_timeout=30
             ) as ws:
                 start_time = time.time()
-                max_wait = 1200  # 20 minutes max for video
+                max_wait = 3600  # 60 minutes max for video
 
                 async for message in ws:
                     # Timeout check
                     if time.time() - start_time > max_wait:
-                        raise TimeoutError("Video generation timed out (20 min)")
+                        raise TimeoutError("Video generation timed out (60 min)")
 
                     if isinstance(message, str):
                         data = json.loads(message)
@@ -588,7 +616,7 @@ async def fetch_video(filename: str, subfolder: str) -> bytes:
     if subfolder:
         params["subfolder"] = subfolder
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.get(f"{COMFYUI_URL}/view", params=params)
         response.raise_for_status()
         return response.content
