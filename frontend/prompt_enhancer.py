@@ -1,7 +1,7 @@
 """
 Prompt Enhancement Module for Z-Image-Turbo
 
-Uses Qwen2.5-1.5B-Instruct on CPU to transform simple prompts into
+Uses Qwen2.5-7B-Instruct on CPU to transform simple prompts into
 detailed visual descriptions suitable for image generation.
 """
 
@@ -11,8 +11,8 @@ from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 
 # Model configuration
-MODEL_REPO = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-MODEL_FILE = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+MODEL_REPO = "bartowski/Qwen2.5-7B-Instruct-GGUF"
+MODEL_FILE = "Qwen2.5-7B-Instruct-Q4_K_M.gguf"
 MODEL_DIR = Path(os.environ.get("LLM_MODEL_DIR", "/app/models/llm"))
 
 # System prompt from the model creator
@@ -34,7 +34,7 @@ Only strictly output the final modified prompt, nothing else."""
 
 
 class PromptEnhancer:
-    """CPU-based prompt enhancement using Qwen2.5-1.5B-Instruct."""
+    """CPU-based prompt enhancement using Qwen2.5-7B-Instruct."""
     
     _instance = None
     _llm = None
@@ -68,15 +68,15 @@ class PromptEnhancer:
             return
         
         model_path = self._ensure_model_downloaded()
-        print("Loading Qwen2.5-1.5B-Instruct for prompt enhancement...")
+        print("Loading Qwen2.5-7B-Instruct for prompt enhancement...")
         
         # Get CPU thread count for optimal performance
         import multiprocessing
-        cpu_threads = min(multiprocessing.cpu_count(), 8)  # Cap at 8 for efficiency
+        cpu_threads = max(1, int(multiprocessing.cpu_count() * 0.8))  # Use 80% of cores
         
         self._llm = Llama(
             model_path=str(model_path),
-            n_ctx=1024,         # Reduced context - prompts don't need 2048
+            n_ctx=2048,         # Larger context for 7B model
             n_threads=cpu_threads,  # Use more CPU threads
             n_gpu_layers=0,     # CPU only - preserve GPU for image gen
             verbose=False
@@ -112,7 +112,7 @@ class PromptEnhancer:
             # Generate enhanced prompt
             response = self._llm.create_chat_completion(
                 messages=messages,
-                max_tokens=256,      # Reduced from 512 for faster generation
+                max_tokens=384,      # More detailed outputs with 7B model
                 temperature=0.7,
                 top_p=0.9,
             )

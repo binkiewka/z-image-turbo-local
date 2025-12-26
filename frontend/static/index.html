@@ -239,26 +239,6 @@
                             <p class="text-xs text-gray-500 mt-1">Press Ctrl+Enter to generate</p>
                         </div>
 
-                        <!-- Enhanced Prompt Output -->
-                        <div x-show="enhancedPrompt" x-transition class="mb-6">
-                            <label class="block text-sm font-medium text-accent mb-2">Enhanced Prompt</label>
-                            <div class="bg-accent/5 border border-accent/20 rounded-xl p-4 max-h-[150px] overflow-y-auto">
-                                <p class="text-gray-300 text-sm" x-text="enhancedPrompt"></p>
-                            </div>
-                            <div class="flex gap-2 mt-3">
-                                <button
-                                    @click="imagePrompt = enhancedPrompt; generateImage()"
-                                    class="flex-1 bg-accent hover:bg-accent-hover text-black font-medium py-2 px-4 rounded-lg transition-colors duration-200">
-                                    Generate with Enhanced
-                                </button>
-                                <button
-                                    @click="imagePrompt = enhancedPrompt; enhancedPrompt = ''"
-                                    class="px-4 py-2 bg-surface-light hover:bg-gray-700 text-gray-300 rounded-lg transition-colors duration-200">
-                                    Copy
-                                </button>
-                            </div>
-                        </div>
-
                         <!-- Action Buttons -->
                         <div class="flex gap-3 mb-6">
                             <button
@@ -279,7 +259,13 @@
                                 :disabled="isEnhancing"
                                 class="px-6 py-3 bg-surface-light hover:bg-gray-700 disabled:opacity-50 text-gray-300 font-medium rounded-xl transition-colors duration-200">
                                 <span x-show="!isEnhancing">Enhance</span>
-                                <span x-show="isEnhancing">...</span>
+                                <span x-show="isEnhancing" class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Enhancing...
+                                </span>
                             </button>
                         </div>
 

@@ -10,7 +10,6 @@ function app() {
 
         // Image generation state
         imagePrompt: '',
-        enhancedPrompt: '',
         currentImage: null,
         isGenerating: false,
         isEnhancing: false,
@@ -198,7 +197,6 @@ function app() {
             }
 
             this.isEnhancing = true;
-            this.enhancedPrompt = '';
 
             try {
                 const response = await fetch('/api/enhance', {
@@ -209,7 +207,7 @@ function app() {
 
                 if (response.ok) {
                     const data = await response.json();
-                    this.enhancedPrompt = data.enhanced;
+                    this.imagePrompt = data.enhanced;
                     this.showToast('Prompt enhanced!');
                 } else {
                     const error = await response.json();
