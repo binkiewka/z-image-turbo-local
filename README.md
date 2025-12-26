@@ -7,7 +7,11 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 ![GPU](https://img.shields.io/badge/GPU-RTX%203060%2012GB-green)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 
-![Z-Image-Turbo Interface](docs/images/screenshot.jpg)
+### Image Generation
+![Z-Image-Turbo Interface](docs/images/screenshot1.jpg)
+
+### Video Generation
+![WAN 2.2 Video Generator](docs/images/screenshot2.jpg)
 
 ## Features
 
