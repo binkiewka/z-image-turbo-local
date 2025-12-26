@@ -430,8 +430,10 @@ def prepare_video_workflow(
     # Upscaling & Interpolation
     # ============================
     
-    # Start chain from VAE Decode (Node 14)
-    current_image_node = ["14", 0]
+    # Start chain from VAE Decode
+    # T2V: Node 14, I2V: Node 15
+    vae_decode_id = "14" if mode == "Text to Video" else "15"
+    current_image_node = [vae_decode_id, 0]
     
     # 1. Image Upscale
     if upscale_enabled and upscale_model:
@@ -475,8 +477,22 @@ def prepare_video_workflow(
         }
         current_image_node = ["102", 0]
 
+    # Determine Output Node ID based on mode
+    # T2V uses Node 15, I2V uses Node 16 for Video Combine
+    combine_node_id = "15" if mode == "Text to Video" else "16"
+
+    # Adjust Frame Rate for Interpolation
+    # If we interpolated frames (e.g. 2x), we must increase FPS (e.g. 16 -> 32)
+    # to maintain the same playback speed, resulting in smoother video.
+    if interpolate_enabled and interpolate_model:
+        # Base FPS is 16
+        base_fps = 16 
+        new_fps = base_fps * interpolate_multiplier
+        workflow[combine_node_id]["inputs"]["frame_rate"] = new_fps
+        print(f"Setting interpolated video FPS to {new_fps} (Base: {base_fps} * Multiplier: {interpolate_multiplier})")
+
     # Link final image to Video Combine
-    workflow["15"]["inputs"]["images"] = current_image_node
+    workflow[combine_node_id]["inputs"]["images"] = current_image_node
 
     return workflow, seed
 
