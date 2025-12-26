@@ -18,13 +18,14 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 ### Image Generation (Z-Image-Turbo)
 
 - **Fast Generation**: ~3 seconds per image with 8-step distilled model
-- **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-1.5B (runs on CPU, non-blocking)
+- **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-7B (runs on CPU, non-blocking)
 - **Advanced Controls**: Adjustable steps (4-12), multiple aspect ratios
 - **Image History**: Gallery of last 12 generated images
 
 ### Video Generation (WAN 2.2)
 
 - **Image-to-Video (I2V)**: Animate Z-Image generated images into videos
+- **AI Prompt Enhancement**: Cinematography-focused prompt expansion optimized for WAN 2.2 (camera movements, lighting, motion)
 - **4-Step Lightning LoRAs**: Fast generation with distilled models
 - **VRAM Optimized**: wanBlockSwap enables 14B parameter models on 12GB VRAM
 - **User Model Selection**: Choose any downloaded model from dropdown menus
@@ -46,7 +47,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 │  Port: 7860                                             │
 │  - Tabbed UI (Image / Video)                            │
 │  - WebSocket client for progress tracking               │
-│  - Prompt Enhancement (Qwen2.5-1.5B on CPU)             │
+│  - Prompt Enhancement (Qwen2.5-7B on CPU)               │
 └─────────────────────┬───────────────────────────────────┘
                       │ HTTP + WebSocket
 ┌─────────────────────▼───────────────────────────────────┐
@@ -273,13 +274,14 @@ This project officially supports:
    - **Low Noise Model**: Second pass model (e.g., `wan2.2_i2v_low_noise_14B_Q4_K_M.gguf`)
    - **LoRAs**: Select matching Lightning LoRAs for 4-step generation
 6. **Enter prompt**: Describe the motion/animation you want
-7. **Settings**:
+7. **Optional - Enhance Prompt**: Click **Enhance Prompt** to expand your simple prompt into a cinematic description with camera movements, lighting, and motion details optimized for WAN 2.2
+8. **Settings**:
    - **Resolution**: 480p recommended for 12GB VRAM
    - **Frames**: 81 frames = ~5 seconds at 16fps
-8. **Enhancement (Optional)**:
+9. **Post-Processing (Optional)**:
    - **Upscaling**: Enable to double resolution (e.g., 480p -> 960p)
-   - **Interpolation**: Enable RIFE to smoother motion (e.g., 16fps -> 32fps)
-9. **Click "🎬 Generate Video"**: Takes ~15-20 minutes
+   - **Interpolation**: Enable RIFE for smoother motion (e.g., 16fps -> 32fps)
+10. **Click "🎬 Generate Video"**: Takes ~15-20 minutes
 
 > **Note**: Video generation requires both High Noise and Low Noise models with matching LoRAs. The two-pass approach (high noise → low noise) produces better quality.
 
