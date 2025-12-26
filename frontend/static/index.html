@@ -221,9 +221,9 @@
         <main class="max-w-7xl mx-auto">
             <!-- Image Generation Tab -->
             <div x-show="activeTab === 'image'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     <!-- Left Panel: Controls -->
-                    <div class="glass rounded-2xl p-6 glass-hover">
+                    <div class="glass rounded-2xl p-6 glass-hover h-full flex flex-col">
                         <!-- Prompt Input -->
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-400 mb-2">Prompt</label>
@@ -241,7 +241,7 @@
                         <!-- Enhanced Prompt Output -->
                         <div x-show="enhancedPrompt" x-transition class="mb-6">
                             <label class="block text-sm font-medium text-accent mb-2">Enhanced Prompt</label>
-                            <div class="bg-accent/5 border border-accent/20 rounded-xl p-4">
+                            <div class="bg-accent/5 border border-accent/20 rounded-xl p-4 max-h-[150px] overflow-y-auto">
                                 <p class="text-gray-300 text-sm" x-text="enhancedPrompt"></p>
                             </div>
                             <div class="flex gap-2 mt-3">
@@ -340,7 +340,7 @@
                     </div>
 
                     <!-- Right Panel: Output -->
-                    <div class="glass rounded-2xl p-6 glass-hover">
+                    <div class="glass rounded-2xl p-6 glass-hover h-full flex flex-col">
                         <label class="block text-sm font-medium text-gray-400 mb-3">Output</label>
 
                         <!-- Output Display -->
@@ -415,11 +415,11 @@
             </div>
 
             <!-- Video Generation Tab -->
-            <div x-show="activeTab === 'video'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+            <div x-show="activeTab === 'video'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0" class="lg:-mx-24 xl:-mx-36">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
 
                     <!-- Column 1: Prompt & Settings -->
-                    <div class="glass rounded-2xl p-5 glass-hover">
+                    <div class="glass rounded-2xl p-6 glass-hover h-full min-h-[575px]">
                         <h3 class="text-sm font-semibold text-white mb-4">Prompt & Settings</h3>
 
                         <!-- Mode Selection -->
@@ -515,7 +515,7 @@
                     </div>
 
                     <!-- Column 2: Models & Enhancement -->
-                    <div class="glass rounded-2xl p-5 glass-hover">
+                    <div class="glass rounded-2xl p-6 glass-hover h-full min-h-[575px]">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-semibold text-white">Models</h3>
                             <button @click="refreshModels()" class="flex items-center gap-1 px-2 py-1 text-xs bg-surface-light hover:bg-gray-700 border border-gray-600 rounded text-gray-300 hover:text-white transition-colors">
@@ -603,7 +603,7 @@
                     </div>
 
                     <!-- Column 3: Output & Status -->
-                    <div class="glass rounded-2xl p-5 glass-hover">
+                    <div class="glass rounded-2xl p-6 glass-hover h-full min-h-[575px]">
                         <h3 class="text-sm font-semibold text-white mb-4">Output</h3>
 
                         <div class="relative aspect-video bg-black/30 rounded-xl overflow-hidden border border-gray-700/50 mb-4">
