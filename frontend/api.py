@@ -1,7 +1,7 @@
 """
 FastAPI Backend for Z-Image-Turbo & WAN 2.2 Video
 
-Replaces Gradio frontend with a modern REST API + WebSocket backend.
+REST API + WebSocket backend for real-time generation progress.
 """
 
 import os

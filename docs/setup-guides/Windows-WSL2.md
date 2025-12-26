@@ -570,7 +570,7 @@ http://localhost:7860
 
 ### 7.2 Expected UI
 
-You should see a Gradio interface with:
+You should see a web interface with:
 
 - Prompt text box
 - Negative prompt text box

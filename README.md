@@ -31,7 +31,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 ### General
 
 - **Local Deployment**: Complete privacy, runs entirely on your hardware
-- **User-Friendly UI**: Clean Gradio interface with tabbed layout
+- **User-Friendly UI**: Modern web UI with Tailwind CSS + Alpine.js
 - **GGUF Quantization**: Optimized to fit in 12GB VRAM
 - **One-Click Download**: Save images/videos with metadata filenames
 
@@ -39,7 +39,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Frontend (Gradio)                                      │
+│  Frontend (FastAPI + Tailwind CSS)                      │
 │  Port: 7860                                             │
 │  - Tabbed UI (Image / Video)                            │
 │  - WebSocket client for progress tracking               │
@@ -294,7 +294,7 @@ This project officially supports:
 
 ### Ports
 
-- **Frontend**: `7860` (Gradio UI)
+- **Frontend**: `7860` (Web UI)
 - **Backend**: `8188` (ComfyUI API)
 
 To change ports, edit `docker-compose.yml`:
