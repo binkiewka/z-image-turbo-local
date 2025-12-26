@@ -47,7 +47,7 @@ RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
 # Frame Interpolation (RIFE VFI for smoother video) - optional, no requirements.txt
 RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git
 
-# ComfyUI-WanVideoWrapper (CRITICAL for 12GB VRAM - handles WAN 2.2 T2V/I2V with built-in block swap)
+# ComfyUI-WanVideoWrapper (CRITICAL for 12GB VRAM - handles WAN 2.2 I2V with built-in block swap)
 RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
     pip3 install --no-cache-dir -r ComfyUI-WanVideoWrapper/requirements.txt
 

@@ -423,25 +423,6 @@
                     <div class="glass rounded-2xl p-6 glass-hover h-full min-h-[575px]">
                         <h3 class="text-sm font-semibold text-white mb-4">Prompt & Settings</h3>
 
-                        <!-- Mode Selection -->
-                        <div class="mb-4">
-                            <label class="block text-xs text-gray-500 mb-2">Mode</label>
-                            <div class="flex gap-2">
-                                <button
-                                    @click="videoSettings.mode = 't2v'"
-                                    :class="videoSettings.mode === 't2v' ? 'bg-accent text-black' : 'bg-surface-light text-gray-400'"
-                                    class="flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-colors duration-200">
-                                    Text to Video
-                                </button>
-                                <button
-                                    @click="videoSettings.mode = 'i2v'"
-                                    :class="videoSettings.mode === 'i2v' ? 'bg-accent text-black' : 'bg-surface-light text-gray-400'"
-                                    class="flex-1 py-1.5 px-3 rounded-lg text-sm font-medium transition-colors duration-200">
-                                    Image to Video
-                                </button>
-                            </div>
-                        </div>
-
                         <!-- Video Prompt -->
                         <div class="mb-4">
                             <label class="block text-xs text-gray-500 mb-2">Prompt</label>
@@ -453,8 +434,8 @@
                             ></textarea>
                         </div>
 
-                        <!-- I2V Image Upload -->
-                        <div x-show="videoSettings.mode === 'i2v'" x-transition class="mb-4">
+                        <!-- Input Image Upload -->
+                        <div class="mb-4">
                             <label class="block text-xs text-gray-500 mb-2">Input Image</label>
                             <div
                                 @dragover.prevent="isDragging = true"

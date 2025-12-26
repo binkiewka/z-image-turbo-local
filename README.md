@@ -24,8 +24,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 
 ### Video Generation (WAN 2.2)
 
-- **Text-to-Video (T2V)**: Generate videos from text prompts
-- **Image-to-Video (I2V)**: Animate images into videos
+- **Image-to-Video (I2V)**: Animate Z-Image generated images into videos
 - **4-Step Lightning LoRAs**: Fast generation with distilled models
 - **VRAM Optimized**: wanBlockSwap enables 14B parameter models on 12GB VRAM
 - **User Model Selection**: Choose any downloaded model from dropdown menus
@@ -66,7 +65,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 │  - Qwen 3 4B Text Encoder IQ4_XS (2.3GB)                │
 │  - Flux VAE (335MB)                                     │
 │  Video:                                                 │
-│  - WAN 2.2 T2V/I2V GGUF models (8-9GB each)             │
+│  - WAN 2.2 I2V GGUF models (8-9GB each)                 │
 │  - UMT5 XXL Text Encoder FP8 (6.7GB)                    │
 │  - WAN 2.1 VAE (254MB)                                  │
 │  - Lightning LoRAs for 4-step generation                │
@@ -175,16 +174,10 @@ wget -O models/text_encoders/Qwen_3_4b-IQ4_XS.gguf \
 
 #### Video Generation Models (Optional)
 
-For WAN 2.2 video generation, download from [city96/wan2.2-gguf](https://huggingface.co/city96/wan2.2-gguf):
+For WAN 2.2 Image-to-Video generation, download from [city96/wan2.2-gguf](https://huggingface.co/city96/wan2.2-gguf):
 
 ```bash
-# T2V Models (Text-to-Video) - Pick Q4_K_M or Q4_K_S
-wget -O models/diffusion_models/wan2.2_t2v_high_noise_14B_Q4_K_M.gguf \
-  "https://huggingface.co/city96/wan2.2-t2v-14B-gguf/resolve/main/wan2.2_t2v_high_noise_14B_Q4_K_M.gguf"
-wget -O models/diffusion_models/wan2.2_t2v_low_noise_14B_Q4_K_M.gguf \
-  "https://huggingface.co/city96/wan2.2-t2v-14B-gguf/resolve/main/wan2.2_t2v_low_noise_14B_Q4_K_M.gguf"
-
-# I2V Models (Image-to-Video)
+# I2V Models (Image-to-Video) - Pick Q4_K_M or Q4_K_S
 wget -O models/diffusion_models/wan2.2_i2v_high_noise_14B_Q4_K_M.gguf \
   "https://huggingface.co/city96/wan2.2-i2v-14B-gguf/resolve/main/wan2.2_i2v_high_noise_14B_Q4_K_M.gguf"
 wget -O models/diffusion_models/wan2.2_i2v_low_noise_14B_Q4_K_M.gguf \
@@ -198,11 +191,7 @@ wget -O models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
 wget -O models/vae/wan_2.1_vae.safetensors \
   "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 
-# Lightning LoRAs for 4-step generation
-wget -O models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors \
-  "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
-wget -O models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors \
-  "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
+# Lightning LoRAs for 4-step I2V generation
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
   "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
@@ -215,9 +204,9 @@ wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
 wget -O models/upscaler/RealESRGAN_x2.pth \
   "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x2.pth"
 
-# RIFE v4.7 for Frame Interpolation
-wget -O models/vfi/rife47.pth \
-  "https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife47.pth"
+# RIFE v4.9 for Frame Interpolation
+wget -O models/vfi/rife49.pth \
+  "https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth"
 ```
 
 ```
@@ -273,17 +262,17 @@ This project officially supports:
    - Click **✨ Enhance** to get an AI-expanded version of your prompt (~5-10s)
 6. **Download**: Click the download link to save the image
 
-### Video Generation
+### Video Generation (Image-to-Video)
 
-1. **Select the Video Tab**: Click "🎬 Video Generation (WAN 2.2)"
-2. **Click "🔄 Refresh Model List"**: Populates dropdowns with available models
-3. **Choose Mode**: Text-to-Video or Image-to-Video
-4. **Select Models**:
-   - **High Noise Model**: First pass model (e.g., `wan2.2_t2v_high_noise_14B_Q4_K_M.gguf`)
-   - **Low Noise Model**: Second pass model (e.g., `wan2.2_t2v_low_noise_14B_Q4_K_M.gguf`)
+1. **Generate a source image**: First create an image using the Image tab
+2. **Select the Video Tab**: Click "🎬 Video Generation (WAN 2.2)"
+3. **Click "🔄 Refresh Model List"**: Populates dropdowns with available models
+4. **Upload your source image**: Drag and drop or click to upload the Z-Image generated image
+5. **Select Models**:
+   - **High Noise Model**: First pass model (e.g., `wan2.2_i2v_high_noise_14B_Q4_K_M.gguf`)
+   - **Low Noise Model**: Second pass model (e.g., `wan2.2_i2v_low_noise_14B_Q4_K_M.gguf`)
    - **LoRAs**: Select matching Lightning LoRAs for 4-step generation
-5. **Enter prompt**: Describe the video you want
-6. **For Image-to-Video**: Upload a source image
+6. **Enter prompt**: Describe the motion/animation you want
 7. **Settings**:
    - **Resolution**: 480p recommended for 12GB VRAM
    - **Frames**: 81 frames = ~5 seconds at 16fps
@@ -356,7 +345,7 @@ The system uses ~11.4GB VRAM with default settings. If you experience OOM errors
 - **Fix**:
   1. Wait for backend to fully start (check `docker compose logs comfyui`)
   2. Click "🔄 Refresh Model List" button
-  3. Verify model files are in `models/diffusion_models/` with "wan" in the filename
+  3. Verify I2V model files are in `models/diffusion_models/` with "i2v" in the filename
 
 ### Video: "Generation timed out (20 min)"
 
@@ -431,7 +420,7 @@ docker compose logs -f comfyui   # Backend only
 ### Video Generation
 
 - **WAN 2.2**: [Wan-Video](https://github.com/Wan-Video/Wan2.1)
-- **WAN 2.2 GGUF**: [city96](https://huggingface.co/city96/wan2.2-t2v-14B-gguf)
+- **WAN 2.2 GGUF**: [city96](https://huggingface.co/city96/wan2.2-i2v-14B-gguf)
 - **Lightning LoRAs**: [Kijai](https://huggingface.co/Kijai/WanVideo_comfy)
 - **wanBlockSwap**: [city96](https://github.com/city96/wanBlockSwap)
 - **VideoHelperSuite**: [Kosinkadink](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)

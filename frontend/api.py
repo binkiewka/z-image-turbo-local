@@ -56,9 +56,6 @@ VIDEO_OUTPUT_DIR = Path("/app/output")
 with open("workflow_api.json", "r") as f:
     WORKFLOW_TEMPLATE = json.load(f)
 
-with open("workflow_video_t2v.json", "r") as f:
-    WORKFLOW_VIDEO_T2V = json.load(f)
-
 with open("workflow_video_i2v.json", "r") as f:
     WORKFLOW_VIDEO_I2V = json.load(f)
 
@@ -79,7 +76,7 @@ class ImageGenerateRequest(BaseModel):
 
 
 class VideoGenerateRequest(BaseModel):
-    mode: str = "t2v"  # "t2v" or "i2v"
+    mode: str = "i2v"  # I2V only (T2V removed)
     prompt: str
     seed: int = -1
     resolution: str = "480p"
@@ -123,7 +120,6 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
 
 
 def prepare_video_workflow(
-    mode: str,
     prompt: str,
     seed: int,
     width: int,
@@ -133,18 +129,15 @@ def prepare_video_workflow(
     model_low: str,
     lora_high: str,
     lora_low: str,
-    input_image: str = None,
+    input_image: str,
     upscale_enabled: bool = False,
     upscale_model: str = None,
     interpolate_enabled: bool = False,
     interpolate_model: str = None,
     interpolate_multiplier: int = 2
 ) -> tuple[dict, int]:
-    """Prepare the video workflow with user inputs."""
-    if mode == "t2v":
-        workflow = json.loads(json.dumps(WORKFLOW_VIDEO_T2V))
-    else:
-        workflow = json.loads(json.dumps(WORKFLOW_VIDEO_I2V))
+    """Prepare the I2V video workflow with user inputs."""
+    workflow = json.loads(json.dumps(WORKFLOW_VIDEO_I2V))
 
     if seed == -1:
         seed = random.randint(0, 2**32 - 1)
@@ -156,25 +149,16 @@ def prepare_video_workflow(
     workflow["5"]["inputs"]["lora_name"] = lora_low
     workflow["8"]["inputs"]["text"] = prompt
 
-    # Update resolution/frames/seed
-    if mode == "t2v":
-        workflow["10"]["inputs"]["width"] = width
-        workflow["10"]["inputs"]["height"] = height
-        workflow["10"]["inputs"]["length"] = frames
-        workflow["11"]["inputs"]["noise_seed"] = seed
-        workflow["12"]["inputs"]["noise_seed"] = seed
-    else:
-        workflow["12"]["inputs"]["width"] = width
-        workflow["12"]["inputs"]["height"] = height
-        workflow["12"]["inputs"]["length"] = frames
-        workflow["13"]["inputs"]["noise_seed"] = seed
-        workflow["14"]["inputs"]["noise_seed"] = seed
-        if input_image:
-            workflow["10"]["inputs"]["image"] = input_image
+    # Update resolution/frames/seed (I2V node IDs)
+    workflow["12"]["inputs"]["width"] = width
+    workflow["12"]["inputs"]["height"] = height
+    workflow["12"]["inputs"]["length"] = frames
+    workflow["13"]["inputs"]["noise_seed"] = seed
+    workflow["14"]["inputs"]["noise_seed"] = seed
+    workflow["10"]["inputs"]["image"] = input_image
 
-    # Enhancement nodes
-    vae_decode_id = "14" if mode == "t2v" else "15"
-    current_image_node = [vae_decode_id, 0]
+    # Enhancement nodes (I2V: VAE decode is node 15)
+    current_image_node = ["15", 0]
 
     if upscale_enabled and upscale_model:
         workflow["100"] = {
@@ -208,7 +192,7 @@ def prepare_video_workflow(
         }
         current_image_node = ["102", 0]
 
-    combine_node_id = "15" if mode == "t2v" else "16"
+    combine_node_id = "16"  # I2V video combine node
 
     if interpolate_enabled and interpolate_model:
         base_fps = 16
@@ -318,9 +302,8 @@ async def free_comfyui_memory():
 
 
 def scan_video_models() -> dict:
-    """Scan for available WAN 2.2 video models."""
+    """Scan for available WAN 2.2 I2V video models."""
     models = {
-        "t2v_high": [], "t2v_low": [],
         "i2v_high": [], "i2v_low": [],
         "loras_high": [], "loras_low": [],
     }
@@ -333,17 +316,11 @@ def scan_video_models() -> dict:
                 all_models = data["UnetLoaderGGUF"]["input"]["required"]["unet_name"][0]
                 for model in all_models:
                     model_lower = model.lower()
-                    if "wan" in model_lower or "wan2" in model_lower:
-                        if "t2v" in model_lower:
-                            if "high" in model_lower:
-                                models["t2v_high"].append(model)
-                            elif "low" in model_lower:
-                                models["t2v_low"].append(model)
-                        elif "i2v" in model_lower:
-                            if "high" in model_lower:
-                                models["i2v_high"].append(model)
-                            elif "low" in model_lower:
-                                models["i2v_low"].append(model)
+                    if ("wan" in model_lower or "wan2" in model_lower) and "i2v" in model_lower:
+                        if "high" in model_lower:
+                            models["i2v_high"].append(model)
+                        elif "low" in model_lower:
+                            models["i2v_low"].append(model)
 
         response = httpx.get(f"{COMFYUI_URL}/object_info/LoraLoaderModelOnly", timeout=10.0)
         if response.status_code == 200:
@@ -489,8 +466,8 @@ async def get_models():
     video_models = scan_video_models()
     enhancement_models = scan_enhancement_models()
 
-    all_high = sorted(set(video_models["t2v_high"] + video_models["i2v_high"]))
-    all_low = sorted(set(video_models["t2v_low"] + video_models["i2v_low"]))
+    all_high = sorted(video_models["i2v_high"])
+    all_low = sorted(video_models["i2v_low"])
 
     return {
         "video": {
@@ -574,13 +551,12 @@ async def generate_video_endpoint(request: VideoGenerateRequest):
     if not request.lora_high or not request.lora_low:
         raise HTTPException(status_code=400, detail="Both high and low noise LoRAs required")
 
-    if request.mode == "i2v" and not request.input_image:
-        raise HTTPException(status_code=400, detail="Input image required for I2V mode")
+    if not request.input_image:
+        raise HTTPException(status_code=400, detail="Input image required for video generation")
 
     width, height = VIDEO_RESOLUTIONS.get(request.resolution, (848, 480))
 
     workflow, actual_seed = prepare_video_workflow(
-        mode=request.mode,
         prompt=request.prompt.strip(),
         seed=request.seed,
         width=width,

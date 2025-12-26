@@ -40,9 +40,8 @@ function app() {
         // Video duration (in seconds) - frames calculated as duration * 16 + 1
         videoDuration: 5,
 
-        // Video settings
+        // Video settings (I2V only)
         videoSettings: {
-            mode: 't2v',
             resolution: '480p',
             seed: -1,
             frames: 81,  // Will be calculated from videoDuration
@@ -445,7 +444,7 @@ function app() {
                 return;
             }
 
-            if (this.videoSettings.mode === 'i2v' && !this.videoSettings.inputImage) {
+            if (!this.videoSettings.inputImage) {
                 this.showToast('Please upload an input image', 'error');
                 return;
             }
@@ -461,7 +460,7 @@ function app() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        mode: this.videoSettings.mode,
+                        mode: 'i2v',
                         prompt: this.videoPrompt,
                         seed: this.videoSettings.seed,
                         resolution: this.videoSettings.resolution,

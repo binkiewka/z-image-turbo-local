@@ -18,7 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api.py .
 COPY prompt_enhancer.py .
 COPY workflow_api.json .
-COPY workflow_video_t2v.json .
 COPY workflow_video_i2v.json .
 
 # Copy static files
