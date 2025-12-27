@@ -39,7 +39,7 @@ Windows Subsystem for Linux 2 (WSL2) is a compatibility layer that allows you to
 | **Windows Version** | Windows 10 version 21H2 or higher, OR Windows 11 |
 | **GPU** | NVIDIA RTX 3060 12GB (or similar with 12GB+ VRAM) |
 | **RAM** | 16GB minimum (32GB recommended) |
-| **Storage** | 20GB+ free space (15GB for models + Docker images) |
+| **Storage** | 15GB+ for image generation, 60GB+ for full video support |
 | **Virtualization** | Enabled in BIOS/UEFI |
 | **Administrator** | Administrator access to Windows |
 | **Ports** | 7860 and 8188 available (not 8081/8082) |
@@ -418,7 +418,7 @@ cd ~/z-image-turbo-local
 ### 4.4 Create Model Directories
 
 ```bash
-mkdir -p models/diffusion_models models/text_encoders models/vae output
+mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler models/vfi output
 ```
 
 Verify structure:
@@ -431,15 +431,20 @@ Expected output:
 
 ```
 drwxr-xr-x  2 user user 4096 Dec 23 10:00 diffusion_models
+drwxr-xr-x  2 user user 4096 Dec 23 10:00 loras
 drwxr-xr-x  2 user user 4096 Dec 23 10:00 text_encoders
+drwxr-xr-x  2 user user 4096 Dec 23 10:00 upscaler
 drwxr-xr-x  2 user user 4096 Dec 23 10:00 vae
+drwxr-xr-x  2 user user 4096 Dec 23 10:00 vfi
 ```
 
 ---
 
 ## Step 5: Download Models
 
-You'll need to download three model files totaling ~10GB.
+### Image Generation Models (Required)
+
+You'll need to download three model files totaling ~10GB for image generation.
 
 ### 5.1 Download via wget
 
@@ -513,6 +518,79 @@ done
 
 ---
 
+### Video Generation Models (Optional)
+
+For WAN 2.2 Image-to-Video generation, download the following models. These add ~25GB of additional storage.
+
+#### 5.4 I2V Diffusion Models
+
+Download from [QuantStack/Wan2.2-I2V-A14B-GGUF](https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF):
+
+```bash
+# High Noise Model (~9.65GB)
+wget -O models/diffusion_models/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf \
+  "https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf"
+
+# Low Noise Model (~9.65GB)
+wget -O models/diffusion_models/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf \
+  "https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf"
+```
+
+#### 5.5 UMT5 Text Encoder and WAN VAE
+
+```bash
+# UMT5 Text Encoder (6.7GB)
+wget -O models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+
+# WAN VAE (254MB)
+wget -O models/vae/wan_2.1_vae.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
+```
+
+#### 5.6 Lightning LoRAs for 4-Step Generation
+
+Download from [Comfy-Org/Wan_2.2_ComfyUI_Repackaged](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/tree/main/split_files/loras):
+
+```bash
+# High Noise LoRA (~1.23GB)
+wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+
+# Low Noise LoRA (~1.23GB)
+wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+```
+
+#### 5.7 Improvement Models (Optional)
+
+For upscaling and frame interpolation:
+
+```bash
+# RealESRGAN x2 Upscaler (67MB)
+wget -O models/upscaler/RealESRGAN_x2.pth \
+  "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x2.pth"
+
+# RIFE v4.9 for Frame Interpolation (21MB)
+wget -O models/vfi/rife49.pth \
+  "https://huggingface.co/hfmaster/models-moved/resolve/main/rife/rife49.pth"
+```
+
+#### 5.8 Verify Video Model Downloads
+
+```bash
+ls -lh models/diffusion_models/  # Should show ~7.2GB (image) + ~9.65GB each (video)
+ls -lh models/text_encoders/      # Should show ~2.3GB + ~6.7GB
+ls -lh models/vae/                 # Should show ~335MB + ~254MB
+ls -lh models/loras/               # Should show ~1.23GB each
+ls -lh models/upscaler/            # Should show ~67MB
+ls -lh models/vfi/                 # Should show ~21MB
+```
+
+> ⚠️ If any file shows **0 bytes**, delete it and re-download.
+
+---
+
 ## Step 6: Build and Run
 
 ### 6.1 Build Docker Containers
@@ -570,18 +648,24 @@ http://localhost:7860
 
 ### 7.2 Expected UI
 
-You should see a web interface with:
+You should see a tabbed web interface with:
 
+**Image Tab (🖼️ Image Generation):**
 - Prompt text box
-- Negative prompt text box
 - Seed input (-1 for random)
 - Steps slider (4-12, default 8)
 - Aspect ratio dropdown (1:1, 3:4, 4:3, 16:9, 9:16)
-- Generate button
-- Image display area
-- Download link
+- Generate / Enhance buttons
+- Image gallery (last 12 images)
 
-### 7.3 Test Generation
+**Video Tab (🎬 Video Generation):** *(if video models installed)*
+- Image upload area
+- Model selection dropdowns (High/Low Noise, LoRAs)
+- Prompt text box with Enhance button
+- Resolution and frame settings
+- Post-processing options (Upscaling, Interpolation)
+
+### 7.3 Test Image Generation
 
 Try this sample prompt:
 
@@ -591,7 +675,25 @@ a cat wearing a wizard hat, detailed, high quality
 
 Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to model loading).
 
-### 7.4 Performance Expectations
+### 7.4 Test Video Generation (Optional)
+
+If you installed video models:
+
+1. **Generate a source image** first using the Image tab
+2. **Switch to Video tab** (🎬 Video Generation)
+3. **Click "🔄 Refresh Model List"** to populate model dropdowns
+4. **Upload your source image** (drag and drop or click to upload)
+5. **Select models:**
+   - High Noise Model: `Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf`
+   - Low Noise Model: `Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf`
+   - Select matching Lightning LoRAs for 4-step generation
+6. **Enter a motion prompt** (e.g., "gentle breeze, subtle movement")
+7. **Optional:** Click "Enhance Prompt" for cinematic description
+8. **Click "🎬 Generate Video"** (takes ~15-20 minutes)
+
+### 7.5 Performance Expectations
+
+**Image Generation:**
 
 | Metric | Expected Value |
 |--------|----------------|
@@ -599,6 +701,16 @@ Click "Generate" and wait ~3 seconds (first generation may take 10-30s due to mo
 | Subsequent generations | ~3 seconds |
 | VRAM usage | ~11.4GB / 12GB |
 | Maximum resolution | 1024x1024 |
+
+**Video Generation:**
+
+| Metric | Expected Value |
+|--------|----------------|
+| Generation time | ~15-20 minutes |
+| VRAM usage | ~10-11GB (with wanBlockSwap) |
+| Resolution | 848x480 (480p) |
+| Duration | ~5 seconds (81 frames @ 16fps) |
+| Output format | MP4 (H.264) |
 
 ---
 
@@ -972,6 +1084,74 @@ torch.cuda.OutOfMemoryError: CUDA out of memory
 
    ```powershell
    wsl --shutdown
+   ```
+
+---
+
+### Issue: Video Model Dropdowns Empty
+
+**Symptoms:**
+- Video tab shows empty model selection dropdowns
+- "Refresh Model List" doesn't populate options
+
+**Solutions:**
+
+1. **Wait for backend to fully start:**
+
+   ```bash
+   docker compose logs comfyui
+   ```
+
+   Wait until you see "Starting server" message.
+
+2. **Click "🔄 Refresh Model List"** button in the Video tab
+
+3. **Verify I2V models are downloaded:**
+
+   ```bash
+   ls -lh models/diffusion_models/ | grep -i wan
+   ```
+
+   Should show files with "HighNoise" and "LowNoise" in names.
+
+### Issue: Video Generation Timeout (20+ min)
+
+**Symptoms:**
+- Video generation times out without completing
+- Progress stalls at certain percentage
+
+**Solutions:**
+
+1. **Use Q4_K_S models** instead of Q4_K_M (smaller, faster)
+
+2. **Reduce frame count** to 49 instead of 81
+
+3. **Use 480p resolution only** (848x480)
+
+4. **Close other GPU applications** on Windows
+
+### Issue: Video "CUDA Out of Memory"
+
+**Error during video generation:**
+
+```
+torch.cuda.OutOfMemoryError: CUDA out of memory
+```
+
+**Solutions:**
+
+1. **Use 480p (848x480) resolution only** - 720p requires more than 12GB VRAM
+
+2. **Reduce frames** to 49-81 maximum
+
+3. **Disable upscaling/interpolation** during generation
+
+4. **Close Chrome/Edge** and other GPU-using apps on Windows
+
+5. **Ensure no other Docker containers** are using the GPU:
+
+   ```bash
+   docker ps
    ```
 
 ---
