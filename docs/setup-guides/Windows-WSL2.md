@@ -419,6 +419,9 @@ cd ~/z-image-turbo-local
 
 ```bash
 mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler models/vfi output
+
+# Ensure you own the directories (fixes permission issues if created with sudo)
+sudo chown -R $USER:$USER models/ output/
 ```
 
 Verify structure:
@@ -1085,6 +1088,28 @@ torch.cuda.OutOfMemoryError: CUDA out of memory
    ```powershell
    wsl --shutdown
    ```
+
+---
+
+### Issue: "Permission denied" when downloading models
+
+**Error:**
+
+```
+wget -O models/loras/...safetensors "https://..."
+models/loras/...: Permission denied
+```
+
+**Cause:** Directory owned by root (created with `sudo`) or has restrictive permissions.
+
+**Solution:**
+
+```bash
+sudo chown -R $USER:$USER models/ output/
+chmod -R u+rwX models/ output/
+```
+
+Then retry the download.
 
 ---
 
