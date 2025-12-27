@@ -175,14 +175,14 @@ wget -O models/text_encoders/Qwen_3_4b-IQ4_XS.gguf \
 
 #### Video Generation Models (Optional)
 
-For WAN 2.2 Image-to-Video generation, download from [city96/wan2.2-gguf](https://huggingface.co/city96/wan2.2-gguf):
+For WAN 2.2 Image-to-Video generation, download from [QuantStack/Wan2.2-I2V-A14B-GGUF](https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF):
 
 ```bash
 # I2V Models (Image-to-Video) - Pick Q4_K_M or Q4_K_S
-wget -O models/diffusion_models/wan2.2_i2v_high_noise_14B_Q4_K_M.gguf \
-  "https://huggingface.co/city96/wan2.2-i2v-14B-gguf/resolve/main/wan2.2_i2v_high_noise_14B_Q4_K_M.gguf"
-wget -O models/diffusion_models/wan2.2_i2v_low_noise_14B_Q4_K_M.gguf \
-  "https://huggingface.co/city96/wan2.2-i2v-14B-gguf/resolve/main/wan2.2_i2v_low_noise_14B_Q4_K_M.gguf"
+wget -O models/diffusion_models/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf \
+  "https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf"
+wget -O models/diffusion_models/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf \
+  "https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF/resolve/main/LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf"
 
 # UMT5 Text Encoder (6.7GB)
 wget -O models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors \
@@ -194,9 +194,9 @@ wget -O models/vae/wan_2.1_vae.safetensors \
 
 # Lightning LoRAs for 4-step I2V generation
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
-  "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
-  "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+  "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
 
 #### Improvement Models (Optional)
 
@@ -207,7 +207,7 @@ wget -O models/upscaler/RealESRGAN_x2.pth \
 
 # RIFE v4.9 for Frame Interpolation
 wget -O models/vfi/rife49.pth \
-  "https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth"
+  "https://huggingface.co/hfmaster/models-moved/resolve/main/rife/rife49.pth"
 ```
 
 ```
@@ -215,10 +215,10 @@ wget -O models/vfi/rife49.pth \
 **Verify downloads (important!):**
 
 ```bash
-ls -lh models/diffusion_models/  # Should show ~7.2GB (image) + ~9GB each (video)
+ls -lh models/diffusion_models/  # Should show ~7.2GB (image) + ~9.65GB each (video)
 ls -lh models/text_encoders/      # Should show ~2.3GB + ~6.7GB
 ls -lh models/vae/                 # Should show ~335MB + ~254MB
-ls -lh models/loras/               # Should show ~500MB each
+ls -lh models/loras/               # Should show ~1.23GB each
 ```
 
 > ⚠️ If any file shows **0 bytes**, delete it and re-download. This is a common issue that causes startup failures.
@@ -270,8 +270,8 @@ This project officially supports:
 3. **Click "🔄 Refresh Model List"**: Populates dropdowns with available models
 4. **Upload your source image**: Drag and drop or click to upload the Z-Image generated image
 5. **Select Models**:
-   - **High Noise Model**: First pass model (e.g., `wan2.2_i2v_high_noise_14B_Q4_K_M.gguf`)
-   - **Low Noise Model**: Second pass model (e.g., `wan2.2_i2v_low_noise_14B_Q4_K_M.gguf`)
+   - **High Noise Model**: First pass model (e.g., `Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf`)
+   - **Low Noise Model**: Second pass model (e.g., `Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf`)
    - **LoRAs**: Select matching Lightning LoRAs for 4-step generation
 6. **Enter prompt**: Describe the motion/animation you want
 7. **Optional - Enhance Prompt**: Click **Enhance Prompt** to expand your simple prompt into a cinematic description with camera movements, lighting, and motion details optimized for WAN 2.2
