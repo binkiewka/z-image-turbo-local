@@ -19,13 +19,18 @@ echo.
 :: -----------------------------------------------------------------------------
 echo Step 1 of 5: Checking Prerequisites...
 
-where python >nul 2>&1
+:: Default to 'python', but we will test it.
+set "PYTHON_EXE=python"
+
+:: Check if 'python' command actually runs a real Python (not the Store shim)
+%PYTHON_EXE% --version >nul 2>&1
 if errorlevel 1 goto install_python
+
 echo    - Python found.
 goto check_git
 
 :install_python
-echo    - Python not found. Installing Python 3.10...
+echo    - Python not found (or is just the Store shortcut). Installing Python 3.10...
 echo      Downloading Python installer...
 curl -L -o python_installer.exe https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe
 if errorlevel 1 (
@@ -38,12 +43,16 @@ echo      Installing Python...
 start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
 del python_installer.exe
 
-:: Add to PATH (Try Standard Paths)
+:: Force use of the specific path we just installed to
+set "PYTHON_EXE=C:\Program Files\Python310\python.exe"
+
+:: Add to PATH for future sessions
 set "PATH=%PATH%;C:\Program Files\Python310;C:\Program Files\Python310\Scripts"
 
-where python >nul 2>&1
+:: Verify installation with the full path
+"%PYTHON_EXE%" --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python installation failed or PATH not updated.
+    echo [ERROR] Python installation failed.
     echo         Please restart this script or install Python manually.
     pause
     exit /b
@@ -93,7 +102,14 @@ echo.
 echo Step 2 of 5: Setting up Virtual Environment...
 if exist "venv" goto venv_exists
 echo    - Creating venv...
-python -m venv venv
+:: Use the verified PYTHON_EXE path to create the venv
+"%PYTHON_EXE%" -m venv venv
+if errorlevel 1 (
+    echo [ERROR] Failed to create virtual environment. 
+    echo         Please try running this script as Administrator.
+    pause
+    exit /b
+)
 goto venv_ready
 
 :venv_exists
@@ -101,6 +117,11 @@ echo    - venv already exists.
 
 :venv_ready
 call venv\Scripts\activate
+if errorlevel 1 (
+    echo [ERROR] Failed to activate virtual environment.
+    pause
+    exit /b
+)
 python -m pip install --upgrade pip
 
 :: -----------------------------------------------------------------------------
