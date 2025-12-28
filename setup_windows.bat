@@ -153,7 +153,11 @@ echo    - Installing ComfyUI Requirements...
 pip install -r ComfyUI\requirements.txt
 
 echo    - Installing Project Requirements...
-pip install -r frontend\requirements.txt
+:: Filter out llama-cpp-python from requirements.txt to prevent pip from trying to compile it
+:: We already installed the correct wheel above.
+type frontend\requirements.txt | findstr /v "llama-cpp-python" > frontend\requirements_win.txt
+pip install -r frontend\requirements_win.txt
+del frontend\requirements_win.txt
 
 :: -----------------------------------------------------------------------------
 :: 5. FOLDER LINKING
