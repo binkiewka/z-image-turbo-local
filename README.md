@@ -8,9 +8,11 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 
 ### Image Generation
+
 ![Z-Image-Turbo Interface](docs/images/screenshot1.jpg)
 
 ### Video Generation
+
 ![WAN 2.2 Video Generator](docs/images/screenshot2.jpg)
 
 ## Features
@@ -240,12 +242,21 @@ docker compose logs -f
 
 This project officially supports:
 
-- **Linux** (Ubuntu 22.04, Linux Mint 21.3, or similar): Follow the [Installation](#installation) section above
 - **Windows with WSL2**: Follow the comprehensive [Windows WSL2 Setup Guide](docs/setup-guides/Windows-WSL2.md)
   - Includes step-by-step WSL2 installation
   - NVIDIA GPU passthrough configuration
   - Docker setup (both Docker CE and Docker Desktop options)
   - WSL2-specific troubleshooting and performance optimization
+
+### Windows Native (No Docker/WSL) - Recommended for VMs
+
+For users running inside a **Windows VM** or who prefer not to use Docker/WSL:
+
+1. **Prerequisites**: Install [Python 3.10+](https://www.python.org/downloads/windows/) (Check "Add to PATH") and [Git for Windows](https://git-scm.com/download/win).
+2. **Download**: Clone or Download this repository.
+3. **Install**: Double-click `setup_windows.bat`.
+   - It will set up a virtual environment, install ComfyUI, and download models.
+4. **Run**: Double-click `run.bat` to start.
 
 ## Usage
 
