@@ -252,11 +252,12 @@ This project officially supports:
 
 For users running inside a **Windows VM** or who prefer not to use Docker/WSL:
 
-1. **Prerequisites**: Install [Python 3.10+](https://www.python.org/downloads/windows/) (Check "Add to PATH") and [Git for Windows](https://git-scm.com/download/win).
-2. **Download**: Clone or Download this repository.
-3. **Install**: Double-click `setup_windows.bat`.
+1. **Download**: Clone or Download this repository.
+   > If you don't have Git, just click **Code -> Download ZIP** on GitHub and extract it.
+2. **Install**: Double-click `setup_windows.bat`.
+   - It will automatically install **Python** and **Git** if missing.
    - It will set up a virtual environment, install ComfyUI, and download models.
-4. **Run**: Double-click `run.bat` to start.
+3. **Run**: Double-click `run.bat` to start.
 
 ## Usage
 

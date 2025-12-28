@@ -14,22 +14,58 @@ echo 4. Create Directory Junctions for models (linking project models to ComfyUI
 echo 5. Download required AI models (Optional)
 echo.
 
-:: 1. PREREQUISITES CHECK
+:: 1. PREREQUISITES CHECK & AUTO-INSTALL
 echo [1/5] Checking Prerequisites...
+
+:: Check Python
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Python is not found! Please install Python 3.10 or 3.11.
-    echo         Make sure to check "Add Python to PATH" during installation.
-    pause
-    exit /b
+    echo    - Python not found. Installing Python 3.10...
+    echo      Downloading Python installer...
+    curl -L -o python_installer.exe https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe
+    echo      Installing Python (Detailed logs in python_install.log)...
+    start /wait python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    del python_installer.exe
+    
+    :: Refresh Environment Variables without restarting script (limited success in batch, but we try)
+    set "PATH=%PATH%;C:\Program Files\Python310;C:\Program Files\Python310\Scripts"
+    
+    python --version >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo [ERROR] Python installation failed or PATH not updated.
+        echo         Please restart this script or install Python manually.
+        pause
+        exit /b
+    )
+    echo    - Python installed successfully.
+) else (
+    echo    - Python found.
 )
+
+:: Check Git
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Git is not found! Please install Git for Windows.
-    pause
-    exit /b
+    echo    - Git not found. Installing Git...
+    echo      Downloading Git installer...
+    curl -L -o git_installer.exe https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.1/Git-2.47.1-64-bit.exe
+    echo      Installing Git...
+    start /wait git_installer.exe /VERYSILENT /NORESTART
+    del git_installer.exe
+    
+    :: Try to add standard git path
+    set "PATH=%PATH%;C:\Program Files\Git\cmd"
+    
+    git --version >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo [ERROR] Git installation failed or PATH not updated.
+        echo         Please restart this script or install Git manually.
+        pause
+        exit /b
+    )
+    echo    - Git installed successfully.
+) else (
+    echo    - Git found.
 )
-echo    - Python and Git found.
 
 :: 2. VENV SETUP
 echo.
