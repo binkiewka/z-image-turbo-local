@@ -145,14 +145,15 @@ popd
 echo    - Installing PyTorch (CUDA 12.1)...
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
+echo    - Installing llama-cpp-python (Prebuilt Wheel for CUDA 12.1)...
+:: Install BEFORE requirements.txt prevents compilation attempt
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
 echo    - Installing ComfyUI Requirements...
 pip install -r ComfyUI\requirements.txt
 
 echo    - Installing Project Requirements...
 pip install -r frontend\requirements.txt
-
-echo    - Installing llama-cpp-python (Prebuilt Wheel for CUDA 12.1)...
-pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
 
 :: -----------------------------------------------------------------------------
 :: 5. FOLDER LINKING
