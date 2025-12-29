@@ -6,9 +6,15 @@ detailed visual descriptions suitable for image generation.
 """
 
 import os
+import logging
+import multiprocessing
 from pathlib import Path
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Model configuration
 MODEL_REPO = "bartowski/Qwen2.5-7B-Instruct-GGUF"
@@ -83,14 +89,14 @@ class PromptEnhancer:
         model_path = MODEL_DIR / MODEL_FILE
         
         if not model_path.exists():
-            print(f"Downloading {MODEL_FILE} from HuggingFace...")
+            logger.info(f"Downloading {MODEL_FILE} from HuggingFace...")
             hf_hub_download(
                 repo_id=MODEL_REPO,
                 filename=MODEL_FILE,
                 local_dir=str(MODEL_DIR),
                 local_dir_use_symlinks=False
             )
-            print("Model downloaded successfully!")
+            logger.info("Model downloaded successfully!")
         
         return model_path
     
@@ -100,10 +106,9 @@ class PromptEnhancer:
             return
         
         model_path = self._ensure_model_downloaded()
-        print("Loading Qwen2.5-7B-Instruct for prompt enhancement...")
+        logger.info("Loading Qwen2.5-7B-Instruct for prompt enhancement...")
         
         # Get CPU thread count for optimal performance
-        import multiprocessing
         cpu_threads = max(1, int(multiprocessing.cpu_count() * 0.8))  # Use 80% of cores
         
         self._llm = Llama(
@@ -113,7 +118,7 @@ class PromptEnhancer:
             n_gpu_layers=0,     # CPU only - preserve GPU for image gen
             verbose=False
         )
-        print(f"Enhancer model loaded! (using {cpu_threads} CPU threads)")
+        logger.info(f"Enhancer model loaded! (using {cpu_threads} CPU threads)")
     
     def enhance(self, prompt: str, progress_callback=None) -> str:
         """
@@ -158,7 +163,7 @@ class PromptEnhancer:
             return enhanced
             
         except Exception as e:
-            print(f"Error enhancing prompt: {e}")
+            logger.error(f"Error enhancing prompt: {e}")
             # Return original prompt on error
             return prompt
 
@@ -205,7 +210,7 @@ class PromptEnhancer:
             return enhanced
 
         except Exception as e:
-            print(f"Error enhancing video prompt: {e}")
+            logger.error(f"Error enhancing video prompt: {e}")
             # Return original prompt on error
             return prompt
 

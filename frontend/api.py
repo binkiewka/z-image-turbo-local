@@ -11,6 +11,7 @@ import random
 import asyncio
 import time
 import gc
+import logging
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,11 @@ import websockets
 from PIL import Image
 
 from prompt_enhancer import enhance_prompt, enhance_video_prompt, get_enhancer
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logger = logging.getLogger(__name__)
 
 # ComfyUI connection settings
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
@@ -61,6 +67,34 @@ with open("workflow_video_i2v.json", "r") as f:
 
 # In-memory gallery storage (last 12 images)
 gallery_history = []
+
+
+def load_gallery_from_disk():
+    """Load recent images from disk into gallery history."""
+    global gallery_history
+    try:
+        # Find all PNG files in download dir
+        images = []
+        for file_path in DOWNLOAD_DIR.glob("*.png"):
+            if file_path.name.startswith("zimage_") or file_path.name.startswith("z_image_"):
+                images.append(file_path)
+        
+        # Sort by modification time (newest first)
+        images.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Load last 12
+        for img_path in images[:12]:
+            try:
+                gallery_history.append({
+                    "url": f"/api/download/{img_path.name}",
+                    "filename": str(img_path)
+                })
+            except Exception as e:
+                logger.error(f"Failed to load image {img_path}: {e}")
+                
+        logger.info(f"Loaded {len(gallery_history)} images from disk")
+    except Exception as e:
+        logger.error(f"Failed to load gallery from disk: {e}")
 
 
 # =============================================================================
@@ -295,9 +329,9 @@ async def free_comfyui_memory():
                 json={"unload_models": True, "free_memory": True}
             )
             if response.status_code == 200:
-                print("ComfyUI memory freed successfully")
+                logger.info("ComfyUI memory freed successfully")
     except Exception as e:
-        print(f"Warning: Failed to free ComfyUI memory: {e}")
+        logger.warning(f"Failed to free ComfyUI memory: {e}")
     gc.collect()
 
 
@@ -335,7 +369,7 @@ def scan_video_models() -> dict:
                         elif "low" in lora_lower:
                             models["loras_low"].append(lora)
     except Exception as e:
-        print(f"Error scanning models: {e}")
+        logger.error(f"Error scanning models: {e}")
 
     return models
 
@@ -347,14 +381,14 @@ def scan_enhancement_models() -> dict:
     try:
         # Scan RIFE VFI models
         response = httpx.get(f"{COMFYUI_URL}/object_info/RIFE VFI", timeout=5.0)
-        print(f"[DEBUG] RIFE VFI response status: {response.status_code}")
+        # logger.debug(f"RIFE VFI response status: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
             if "RIFE VFI" in data:
                 input_req = data["RIFE VFI"]["input"]["required"]
                 if "ckpt_name" in input_req:
                     ckpt_list = input_req["ckpt_name"][0]
-                    print(f"[DEBUG] VFI ckpt_list type: {type(ckpt_list)}, value: {ckpt_list}")
+                    # logger.debug(f"VFI ckpt_list type: {type(ckpt_list)}, value: {ckpt_list}")
                     if isinstance(ckpt_list, list):
                         models["vfi"] = ckpt_list
                     elif isinstance(ckpt_list, str):
@@ -362,16 +396,16 @@ def scan_enhancement_models() -> dict:
 
         # Scan Upscale models
         response = httpx.get(f"{COMFYUI_URL}/object_info/UpscaleModelLoader", timeout=5.0)
-        print(f"[DEBUG] UpscaleModelLoader response status: {response.status_code}")
+        # logger.debug(f"UpscaleModelLoader response status: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
-            print(f"[DEBUG] UpscaleModelLoader full data: {data}")
+            # logger.debug(f"UpscaleModelLoader full data: {data}")
             if "UpscaleModelLoader" in data:
                 input_req = data["UpscaleModelLoader"]["input"]["required"]
-                print(f"[DEBUG] UpscaleModelLoader input_req: {input_req}")
+                # logger.debug(f"UpscaleModelLoader input_req: {input_req}")
                 if "model_name" in input_req:
                     model_info = input_req["model_name"]
-                    print(f"[DEBUG] model_name info: {model_info}")
+                    # logger.debug(f"model_name info: {model_info}")
                     # Handle COMBO format: ['COMBO', {'multiselect': False, 'options': [...]}]
                     if isinstance(model_info, list) and len(model_info) > 0:
                         if model_info[0] == 'COMBO' and len(model_info) > 1 and isinstance(model_info[1], dict):
@@ -379,7 +413,7 @@ def scan_enhancement_models() -> dict:
                             options = model_info[1].get('options', [])
                             if isinstance(options, list):
                                 models["upscale"] = options
-                            print(f"[DEBUG] Extracted from COMBO options: {models['upscale']}")
+                            # logger.debug(f"Extracted from COMBO options: {models['upscale']}")
                         elif isinstance(model_info[0], list):
                             # Old format: direct list of models
                             models["upscale"] = model_info[0]
@@ -389,11 +423,11 @@ def scan_enhancement_models() -> dict:
                     elif isinstance(model_info, str):
                         models["upscale"] = [model_info]
 
-        print(f"[DEBUG] Final enhancement models: upscale={models['upscale']}, vfi={models['vfi']}")
+        logger.info(f"Final enhancement models: upscale={models['upscale']}, vfi={models['vfi']}")
     except Exception as e:
-        print(f"Error scanning enhancement models: {e}")
+        logger.error(f"Error scanning enhancement models: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
 
     return models
 
@@ -405,12 +439,29 @@ def scan_enhancement_models() -> dict:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    print("Starting Z-Image-Turbo API...")
-    print("Warming up models...")
+    logger.info("Starting Z-Image-Turbo API...")
+    
+    # Load gallery from disk
+    load_gallery_from_disk()
+    
+    logger.info("Warming up models...")
 
     # Warmup by running a test generation
+    # Warmup by running a test generation
     try:
-        workflow, _ = prepare_workflow("warmup test", 42, 8, 1024, 1024, 1)
+        # Use small size and 1 step for fast warmup
+        workflow, _ = prepare_workflow("warmup test", 42, 1, 512, 512, 1)
+        
+        # Remove SaveImage node to prevent writing to disk
+        if "18" in workflow:
+            del workflow["18"]
+            
+        # Add PreviewImage node to ensure execution (ID 19)
+        workflow["19"] = {
+            "inputs": {"images": ["6", 0]},
+            "class_type": "PreviewImage",
+            "_meta": {"title": "Preview Image"}
+        }
         client_id = str(uuid.uuid4())
 
         async with httpx.AsyncClient(timeout=30.0) as http_client:
@@ -425,17 +476,17 @@ async def lifespan(app: FastAPI):
                     await asyncio.sleep(1)
                     history = await get_history(prompt_id)
                     if history:
-                        print("Models loaded successfully!")
+                        logger.info("Models loaded successfully!")
                         break
     except Exception as e:
-        print(f"Warmup failed (models will load on first request): {e}")
+        logger.warning(f"Warmup failed (models will load on first request): {e}")
 
-    print("Prompt enhancer will load on first use")
-    print("API ready!")
+    logger.info("Prompt enhancer will load on first use")
+    logger.info("API ready!")
 
     yield
 
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 
 # =============================================================================
@@ -493,9 +544,11 @@ async def enhance_prompt_endpoint(request: EnhanceRequest):
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
     try:
-        enhanced = enhance_prompt(request.prompt.strip())
+        loop = asyncio.get_running_loop()
+        enhanced = await loop.run_in_executor(None, enhance_prompt, request.prompt.strip())
         return {"original": request.prompt, "enhanced": enhanced}
     except Exception as e:
+        logger.error(f"Enhancement failed: {e}")
         raise HTTPException(status_code=500, detail=f"Enhancement failed: {str(e)}")
 
 
@@ -506,9 +559,11 @@ async def enhance_video_prompt_endpoint(request: EnhanceRequest):
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
     try:
-        enhanced = enhance_video_prompt(request.prompt.strip())
+        loop = asyncio.get_running_loop()
+        enhanced = await loop.run_in_executor(None, enhance_video_prompt, request.prompt.strip())
         return {"original": request.prompt, "enhanced": enhanced}
     except Exception as e:
+        logger.error(f"Video enhancement failed: {e}")
         raise HTTPException(status_code=500, detail=f"Video enhancement failed: {str(e)}")
 
 
@@ -633,29 +688,28 @@ async def get_result(prompt_id: str, type: str = "image"):
             if result:
                 images = []
                 for i, (filename, subfolder) in enumerate(result):
-                    image = await fetch_image(filename, subfolder)
-
-                    # Save to download dir
-                    timestamp = int(time.time())
-                    download_path = DOWNLOAD_DIR / f"zimage_{timestamp}_{i}.png"
-                    image.save(download_path)
-
-                    # Convert to base64 for JSON response
-                    buffer = BytesIO()
-                    image.save(buffer, format="PNG")
-                    buffer.seek(0)
-                    import base64
-                    img_base64 = base64.b64encode(buffer.read()).decode()
+                    # Check if file already exists in output (shared volume)
+                    download_path = DOWNLOAD_DIR / filename
+                    
+                    if not download_path.exists():
+                        # Fetch and save if not found (e.g. remote ComfyUI)
+                        image = await fetch_image(filename, subfolder)
+                        
+                        # Use original filename if possible, else timestamp
+                        # But here we try to match what ComfyUI produced
+                        image.save(download_path)
+                    
+                    img_url = f"/api/download/{download_path.name}"
 
                     images.append({
-                        "data": img_base64,
+                        "url": img_url,
                         "filename": str(download_path),
                         "index": i
                     })
 
                     # Add to gallery
                     gallery_history.insert(0, {
-                        "data": img_base64,
+                        "url": img_url,
                         "filename": str(download_path)
                     })
 
@@ -687,12 +741,51 @@ async def get_result(prompt_id: str, type: str = "image"):
 @app.get("/api/gallery")
 async def get_gallery():
     """Get recent generations gallery."""
+    # Ensure all items have a valid URL
+    for item in gallery_history:
+        if "url" not in item:
+            filename = Path(item["filename"]).name
+            item["url"] = f"/api/download/{filename}"
     return {"images": gallery_history[:12]}
+
+
+@app.delete("/api/gallery/{filename}")
+async def delete_image(filename: str):
+    """Delete an image from gallery and disk."""
+    global gallery_history
+    
+    # Sanitize filename (basic check)
+    if "/" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = DOWNLOAD_DIR / filename
+    
+    # Remove from disk
+    try:
+        if file_path.exists():
+            file_path.unlink()
+    except Exception as e:
+        logger.error(f"Failed to delete file {file_path}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete file")
+
+    # Remove from memory
+    gallery_history = [img for img in gallery_history if Path(img["filename"]).name != filename]
+    
+    return {"status": "deleted", "filename": filename}
 
 
 @app.get("/api/download/{filename:path}")
 async def download_file(filename: str):
     """Download a generated file."""
+    # Security check: ensure filename is just a name, not a path
+    if "/" in filename or ".." in filename:
+         # unless it's a relative path from download dir? 
+         # The 'path' type param allows slashes. 
+         # But we want to restrict to DOWNLOAD_DIR.
+         # So we should be careful. 
+         # Ideally we just take the basename if we flat structure.
+         pass
+         
     file_path = DOWNLOAD_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")

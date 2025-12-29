@@ -56,9 +56,12 @@ function app() {
             interpolateEnabled: false,
             interpolateModel: '',
             interpolateMultiplier: 2
+
         },
 
-        // UI state
+        // System state
+        isConnected: false,
+        statusInterval: null,
         showVideoModels: true,
         showEnhancement: false,
         isDragging: false,
@@ -81,24 +84,35 @@ function app() {
          * Initialize the application
          */
         async init() {
-            console.log('Z-Image-Turbo initializing...');
-
             // Calculate initial frames from duration
             this.videoSettings.frames = this.videoDuration * 16 + 1;
 
             // Watch videoDuration changes and update frames
             this.$watch('videoDuration', (value) => {
                 this.videoSettings.frames = value * 16 + 1;
-                console.log(`Duration: ${value}s → Frames: ${this.videoSettings.frames}`);
             });
+
+            // Start status polling
+            this.checkStatus();
+            this.statusInterval = setInterval(() => this.checkStatus(), 5000);
 
             // Load models
             await this.refreshModels();
 
             // Load gallery from server
             await this.loadGallery();
+        },
 
-            console.log('Ready!');
+        /**
+         * Check backend connection status
+         */
+        async checkStatus() {
+            try {
+                const response = await fetch('/api/health');
+                this.isConnected = response.ok;
+            } catch (error) {
+                this.isConnected = false;
+            }
         },
 
         /**
@@ -141,9 +155,7 @@ function app() {
                         image: data.image || { aspect_ratios: [] }
                     };
 
-                    console.log('Models loaded:', this.models);
-                    console.log('Upscale models:', this.models.enhancement.upscale);
-                    console.log('VFI models:', this.models.enhancement.vfi);
+
 
                     // Set default selections (always update when refreshing)
                     if (this.models.video.high.length > 0) {
@@ -184,7 +196,37 @@ function app() {
                     this.gallery = data.images || [];
                 }
             } catch (error) {
-                console.error('Failed to load gallery:', error);
+                // Silent fail
+            }
+        },
+
+        /**
+         * Delete an image
+         */
+        async deleteImage(filename) {
+            if (!confirm('Are you sure you want to delete this image?')) return;
+
+            // Get just the filename if full path provided
+            const name = filename.split('/').pop();
+
+            try {
+                const response = await fetch(`/api/gallery/${name}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    this.showToast('Image deleted');
+                    await this.loadGallery();
+
+                    // Clear current image if it was the deleted one
+                    if (this.currentImage && this.currentImage.includes(name)) {
+                        this.currentImage = null;
+                    }
+                } else {
+                    throw new Error('Deletion failed');
+                }
+            } catch (error) {
+                this.showToast('Failed to delete image', 'error');
             }
         },
 
@@ -353,7 +395,7 @@ function app() {
 
                                 if (type === 'image') {
                                     if (resultData.images && resultData.images.length > 0) {
-                                        this.currentImage = 'data:image/png;base64,' + resultData.images[0].data;
+                                        this.currentImage = resultData.images[0].url;
                                         this.statusMessage = `Generated ${resultData.count} image(s)`;
                                         this.statusType = 'success';
                                         this.showToast('Image generated!');

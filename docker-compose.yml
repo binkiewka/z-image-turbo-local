@@ -42,6 +42,7 @@ services:
     environment:
       - COMFYUI_HOST=comfyui
       - COMFYUI_PORT=8188
+      - DOWNLOAD_DIR=/app/output
     volumes:
       - ./models/llm:/app/models/llm
       - ./output:/app/output
