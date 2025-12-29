@@ -719,12 +719,17 @@ async def get_result(prompt_id: str, type: str = "image"):
             result = await get_video_history(prompt_id)
             if result:
                 filename, subfolder = result
-                video_bytes = await fetch_video(filename, subfolder)
+                video_path = DOWNLOAD_DIR / filename
 
-                timestamp = int(time.time())
-                video_path = DOWNLOAD_DIR / f"wan2_video_{timestamp}.mp4"
-                with open(video_path, "wb") as f:
-                    f.write(video_bytes)
+                if video_path.exists():
+                    # File already exists (shared volume), read it
+                    with open(video_path, "rb") as f:
+                        video_bytes = f.read()
+                else:
+                    # Fetch from ComfyUI and save with ORIGINAL filename
+                    video_bytes = await fetch_video(filename, subfolder)
+                    with open(video_path, "wb") as f:
+                        f.write(video_bytes)
 
                 # Free memory after video
                 await free_comfyui_memory()
@@ -796,6 +801,29 @@ async def download_file(filename: str):
 # WebSocket for Progress Updates
 # =============================================================================
 
+# Mapping of Node IDs to user-friendly status messages
+NODE_ID_MAPPINGS = {
+    "1": "Loading CLIP model...",
+    "2": "Loading High Noise Model...",
+    "3": "Loading Low Noise Model...",
+    "4": "Loading High Noise LoRA...",
+    "5": "Loading Low Noise LoRA...",
+    "8": "Encoding prompts...",
+    "9": "Encoding prompts...",
+    "10": "Processing input image...",
+    "11": "Loading VAE...",
+    "12": "Preparing video latents...",
+    "13": "Generating video (High Noise Pass)...",
+    "14": "Refining video (Low Noise Pass)...",
+    "15": "Decoding video frames...",
+    "16": "Saving video...",
+    "100": "Loading Upscale Model...",
+    "101": "Upscaling frames...",
+    "102": "Interpolating frames (RIFE)...",
+    "103": "Extracting last frame...",
+    "104": "Saving last frame..."
+}
+
 @app.websocket("/ws/{client_id}")
 async def websocket_progress(websocket: WebSocket, client_id: str):
     """
@@ -826,15 +854,27 @@ async def websocket_progress(websocket: WebSocket, client_id: str):
                                 "max": prog_data.get("max", 100)
                             })
 
-                        # Forward completion
+                        # Forward completion or status updates
                         elif msg_type == "executing":
                             exec_data = data.get("data", {})
-                            if exec_data.get("node") is None:
+                            node_id = exec_data.get("node")
+
+                            if node_id is None:
+                                # Execution finished
                                 await websocket.send_json({
                                     "type": "complete",
                                     "prompt_id": exec_data.get("prompt_id")
                                 })
                                 return
+                            else:
+                                # New node started executing
+                                status_msg = NODE_ID_MAPPINGS.get(str(node_id))
+                                if status_msg:
+                                    await websocket.send_json({
+                                        "type": "status",
+                                        "message": status_msg,
+                                        "node": node_id
+                                    })
 
                         # Forward errors
                         elif msg_type == "execution_error":

@@ -378,8 +378,16 @@ function app() {
                             this.progress = pct;
                             this.progressText = `Step ${data.value}/${data.max}`;
                         } else {
-                            this.videoProgress = pct;
-                            this.videoProgressText = `Frame ${data.value}/${data.max}`;
+                            // Ignore progress events for video to prevent "Frame X/Y" overwriting status
+                            // We rely purely on 'status' messages for video
+                        }
+                    }
+
+                    if (data.type === 'status') {
+                        if (type === 'video') {
+                            this.videoProgressText = data.message;
+                        } else {
+                            this.progressText = data.message;
                         }
                     }
 
