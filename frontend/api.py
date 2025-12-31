@@ -101,12 +101,20 @@ def load_gallery_from_disk():
 # Pydantic Models
 # =============================================================================
 
+class LoraConfig(BaseModel):
+    name: str
+    strength: float = 1.0
+
+
 class ImageGenerateRequest(BaseModel):
     prompt: str
     seed: int = -1
     steps: int = 8
     aspect_ratio: str = "1:1"
     num_images: int = 1
+    loras: list[LoraConfig] = []
+    upscale_enabled: bool = False
+    upscale_model: Optional[str] = None
 
 
 class VideoGenerateRequest(BaseModel):
@@ -135,7 +143,7 @@ class EnhanceRequest(BaseModel):
 # Helper Functions
 # =============================================================================
 
-def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1) -> tuple[dict, int]:
+def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1, loras: list[LoraConfig] = [], upscale_enabled: bool = False, upscale_model: str = None) -> tuple[dict, int]:
     """Prepare the image workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
 
@@ -149,6 +157,73 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
     workflow["5"]["inputs"]["width"] = width
     workflow["5"]["inputs"]["height"] = height
     workflow["5"]["inputs"]["batch_size"] = num_images
+
+    # --- LoRA Injection ---
+    current_model = ["11", 0] # Default from ModelSamplingAuraFlow
+    current_clip = ["7", 0]
+    
+    # Checkpoint -> (Lora) -> ModelSampling
+    # The template has: 
+    # 9 (Unet) -> 11 (ModelSampling) -> 10 (KSampler) [model]
+    # 7 (Clip) -> 8/3 (TextEncode) -> 10 (KSampler) [positive/negative]
+    
+    # If LoRA:
+    # 9 (Unet) -> Lora (model) -> 11 (ModelSampling)
+    # 7 (Clip) -> Lora (clip) -> 8/3 (TextEncode)
+    
+    # If LoRA:
+    # 9 (Unet) -> Lora (model) -> 11 (ModelSampling)
+    # 7 (Clip) -> Lora (clip) -> 8/3 (TextEncode)
+    
+    if loras:
+        last_model_node = ["9", 0] # Start with Unet Loader
+        last_clip_node = ["7", 0]  # Start with Clip Loader
+        
+        for i, lora_config in enumerate(loras):
+            if not lora_config.name: continue
+            
+            node_id = f"100_{i}"
+            workflow[node_id] = {
+                "inputs": {
+                    "lora_name": lora_config.name,
+                    "strength_model": lora_config.strength,
+                    "strength_clip": lora_config.strength,
+                    "model": last_model_node,
+                    "clip": last_clip_node
+                },
+                "class_type": "LoraLoader",
+                "_meta": {"title": f"Load LoRA {i+1}"}
+            }
+            # Update pointers for next iteration
+            last_model_node = [node_id, 0]
+            last_clip_node = [node_id, 1]
+            
+        # Update final connections
+        workflow["11"]["inputs"]["model"] = last_model_node 
+        workflow["8"]["inputs"]["clip"] = last_clip_node
+        workflow["3"]["inputs"]["clip"] = last_clip_node
+
+    # --- Upscaling ---
+    current_image_node = ["6", 0] # VAE Decode output
+
+    if upscale_enabled and upscale_model:
+        workflow["101"] = {
+            "inputs": {"model_name": upscale_model},
+            "class_type": "UpscaleModelLoader",
+            "_meta": {"title": "Load Upscale Model"}
+        }
+        workflow["102"] = {
+            "inputs": {
+                "upscale_model": ["101", 0],
+                "image": current_image_node
+            },
+            "class_type": "ImageUpscaleWithModel",
+            "_meta": {"title": "Upscale Image"}
+        }
+        current_image_node = ["102", 0]
+        
+    # Final Save
+    workflow["18"]["inputs"]["images"] = current_image_node
 
     return workflow, seed
 
@@ -374,6 +449,28 @@ def scan_video_models() -> dict:
     return models
 
 
+def scan_image_models() -> dict:
+    """Scan for Image LoRAs (in image/ folder)."""
+    models = {
+        "loras": []
+    }
+    try:
+        response = httpx.get(f"{COMFYUI_URL}/object_info/LoraLoader", timeout=10.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "LoraLoader" in data:
+                all_loras = data["LoraLoader"]["input"]["required"]["lora_name"][0]
+                for lora in all_loras:
+                    # Filter for LoRAs in 'image/' directory or standard/root ones if needed.
+                    # For now only taking those explicitly in image/ folder as requested.
+                    if "image/" in lora.lower() or "image\\" in lora.lower():
+                         models["loras"].append(lora)
+    except Exception as e:
+         logger.error(f"Error scanning image models: {e}")
+         
+    return models
+
+
 def scan_enhancement_models() -> dict:
     """Scan for RIFE VFI and Upscale models."""
     models = {"vfi": [], "upscale": []}
@@ -516,6 +613,7 @@ async def get_models():
     """Get all available models."""
     video_models = scan_video_models()
     enhancement_models = scan_enhancement_models()
+    image_models = scan_image_models()
 
     all_high = sorted(video_models["i2v_high"])
     all_low = sorted(video_models["i2v_low"])
@@ -533,6 +631,7 @@ async def get_models():
         },
         "image": {
             "aspect_ratios": list(ASPECT_RATIOS.keys()),
+            "loras": sorted(image_models["loras"]),
         }
     }
 
@@ -584,7 +683,11 @@ async def generate_image_endpoint(request: ImageGenerateRequest):
         request.steps,
         width,
         height,
-        request.num_images
+
+        request.num_images,
+        request.loras,
+        request.upscale_enabled,
+        request.upscale_model
     )
     client_id = str(uuid.uuid4())
 

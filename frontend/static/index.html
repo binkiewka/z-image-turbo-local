@@ -223,8 +223,8 @@
     </style>
 </head>
 
-<body class="bg-honeycomb text-gray-200">
-    <div x-data="app()" x-init="init()" class="min-h-screen p-4 md:p-6 lg:p-8">
+<body class="bg-honeycomb text-gray-200" x-data="app()" x-init="init()">
+    <div class="min-h-screen p-4 md:p-6 lg:p-8">
         <!-- Header -->
         <header class="max-w-7xl mx-auto mb-8">
             <div class="flex items-center justify-between">
@@ -365,6 +365,73 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <!-- LoRA & Upscale -->
+                            <div class="space-y-4 pt-4 border-t border-gray-700/50">
+                                <!-- LoRA -->
+                                <div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="block text-sm font-medium text-gray-400">LoRAs</label>
+                                        <button @click="addLora()"
+                                            class="text-xs text-accent hover:text-accent-hover font-medium">
+                                            + Add
+                                        </button>
+                                    </div>
+
+                                    <template x-for="(model, index) in imageSettings.loras" :key="index">
+                                        <div class="mb-3 bg-white/5 p-2 rounded-lg border border-gray-700/30">
+                                            <div class="flex gap-2 mb-2">
+                                                <select x-model="model.name"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm">
+                                                    <option value="">Select LoRA...</option>
+                                                    <template x-for="l in models.image.loras" :key="l">
+                                                        <option :value="l" x-text="l.split('/').pop()"></option>
+                                                    </template>
+                                                </select>
+                                                <button @click="removeLora(index)"
+                                                    class="text-gray-500 hover:text-red-400 px-1">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <!-- Strength Slider -->
+                                            <div class="flex items-center gap-2 px-1">
+                                                <span class="text-xs text-gray-400 w-12">Strength</span>
+                                                <input type="range" x-model="model.strength" min="0.1" max="2.0"
+                                                    step="0.1"
+                                                    class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-accent">
+                                                <span class="text-xs text-gray-300 w-8 text-right"
+                                                    x-text="model.strength"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="imageSettings.loras.length === 0"
+                                        class="text-center py-2 border border-gray-700/30 border-dashed rounded-lg">
+                                        <p class="text-xs text-gray-600">No LoRAs selected</p>
+                                    </div>
+                                </div>
+
+                                <!-- Upscaling -->
+                                <div>
+                                    <label class="flex items-center gap-2 cursor-pointer mb-2">
+                                        <input type="checkbox" x-model="imageSettings.upscaleEnabled"
+                                            class="accent-accent w-4 h-4">
+                                        <span class="text-sm font-medium text-gray-300">Upscaling</span>
+                                    </label>
+                                    <select x-model="imageSettings.upscaleModel"
+                                        :disabled="!imageSettings.upscaleEnabled"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm disabled:opacity-50">
+                                        <option value="" x-show="models.enhancement.upscale.length === 0">No models
+                                        </option>
+                                        <template x-for="m in models.enhancement.upscale" :key="m">
+                                            <option :value="m" x-text="m"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -413,7 +480,9 @@
 
                             <!-- Generated Image -->
                             <img x-show="currentImage && !isGenerating" :src="currentImage"
-                                class="max-w-full max-h-[400px] object-contain" alt="Generated image">
+                                @click="openFullscreen(currentImage)"
+                                class="max-w-full max-h-[400px] object-contain cursor-pointer transition-transform hover:scale-[1.01]"
+                                alt="Generated image" title="Click to view full screen">
                         </div>
 
                         <!-- Status -->
@@ -719,6 +788,26 @@
                 </div>
             </template>
         </div>
+    </div>
+
+    <!-- Full Screen Modal -->
+    <div x-show="showFullscreen" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm"
+        @click="showFullscreen = false">
+
+        <!-- Close Button -->
+        <button @click="showFullscreen = false"
+            class="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-black/50 rounded-full hover:bg-white/10 transition-colors">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+
+        <img :src="fullscreenImage" @click.stop class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+            alt="Full screen view">
     </div>
 
     <script src="/static/app.js"></script>

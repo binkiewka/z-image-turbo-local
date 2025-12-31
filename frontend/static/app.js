@@ -19,12 +19,19 @@ function app() {
         statusType: 'success',
         gallery: [],
 
+        // Fullscreen state
+        showFullscreen: false,
+        fullscreenImage: '',
+
         // Image settings
         imageSettings: {
             aspectRatio: '1:1',
             seed: -1,
             steps: 8,
-            numImages: 1
+            numImages: 1,
+            loras: [],
+            upscaleEnabled: false,
+            upscaleModel: ''
         },
 
         // Video generation state
@@ -70,7 +77,7 @@ function app() {
         models: {
             video: { high: [], low: [], loras_high: [], loras_low: [] },
             enhancement: { upscale: [], vfi: [] },
-            image: { aspect_ratios: [] }
+            image: { aspect_ratios: [], loras: [] }
         },
 
         // Toast notifications
@@ -152,8 +159,16 @@ function app() {
                             upscale: data.enhancement?.upscale || [],
                             vfi: data.enhancement?.vfi || []
                         },
-                        image: data.image || { aspect_ratios: [] }
+                        image: {
+                            aspect_ratios: data.image?.aspect_ratios || [],
+                            loras: data.image?.loras || []
+                        }
                     };
+
+                    // Default Upscale Model for Image if available
+                    if (this.models.enhancement.upscale.length > 0 && !this.imageSettings.upscaleModel) {
+                        this.imageSettings.upscaleModel = this.models.enhancement.upscale[0];
+                    }
 
 
 
@@ -323,7 +338,13 @@ function app() {
                         seed: this.imageSettings.seed,
                         steps: this.imageSettings.steps,
                         aspect_ratio: this.imageSettings.aspectRatio,
-                        num_images: this.imageSettings.numImages
+                        seed: this.imageSettings.seed,
+                        steps: this.imageSettings.steps,
+                        aspect_ratio: this.imageSettings.aspectRatio,
+                        num_images: this.imageSettings.numImages,
+                        loras: this.imageSettings.loras.filter(l => l.name.length > 0).map(l => ({ name: l.name, strength: parseFloat(l.strength) })),
+                        upscale_enabled: this.imageSettings.upscaleEnabled,
+                        upscale_model: this.imageSettings.upscaleEnabled ? this.imageSettings.upscaleModel : null
                     })
                 });
 
@@ -582,6 +603,22 @@ function app() {
             } finally {
                 this.isGeneratingVideo = false;
             }
+        },
+
+        addLora() {
+            this.imageSettings.loras.push({ name: '', strength: 1.0 });
+        },
+
+        removeLora(index) {
+            this.imageSettings.loras.splice(index, 1);
+        },
+
+        /**
+         * Open image in fullscreen
+         */
+        openFullscreen(url) {
+            this.fullscreenImage = url;
+            this.showFullscreen = true;
         }
     };
 }

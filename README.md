@@ -22,6 +22,9 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 - **Fast Generation**: ~3 seconds per image with 8-step distilled model
 - **AI Prompt Enhancement**: Optional LLM-powered prompt expansion using Qwen2.5-7B (runs on CPU, non-blocking)
 - **Advanced Controls**: Adjustable steps (4-12), multiple aspect ratios
+- **Multi-LoRA Support**: Chain multiple LoRAs with individual strength control
+- **x4 Upscaling**: Integrated NMKD Siax x4 upscaler for high-res output
+- **Full-Screen Viewer**: Click any image to view in high-detail full-screen mode
 - **Image History**: Gallery of last 12 generated images
 
 ### Video Generation (WAN 2.2)
@@ -203,9 +206,11 @@ wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
 #### Improvement Models (Optional)
 
 ```bash
-# RealESRGAN x2 Upscaler
+# RealESRGAN x2 & NMKD Siax x4 Upscalers
 wget -O models/upscaler/RealESRGAN_x2.pth \
   "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x2.pth"
+wget -O models/upscaler/4x_NMKD-Siax_200k.pth \
+  "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Siax_200k.pth"
 
 # RIFE v4.9 for Frame Interpolation
 wget -O models/vfi/rife49.pth \
@@ -270,10 +275,13 @@ For users running inside a **Windows VM** or who prefer not to use Docker/WSL:
    - **Seed**: Use -1 for random, or a specific number for reproducibility
    - **Steps**: 4-12 (default 8) - more steps = better quality but slower
    - **Aspect Ratio**: Choose from 1:1, 3:4, 4:3, 16:9, 9:16
+   - **LoRAs**: Click "+ Add" to stack LoRAs and adjust their strength sliders (0.1 - 2.0)
+   - **Upscaling**: Enable "Upscaling" and select "4x_NMKD-Siax_200k.pth" for 4x resolution
 5. **Generate or Enhance**:
    - Click **🎨 Generate** to create an image immediately
    - Click **✨ Enhance** to get an AI-expanded version of your prompt (~5-10s)
-6. **Download**: Click the download link to save the image
+6. **View**: Click a generated image to open it in full-screen mode
+7. **Download**: Click the download link to save the image
 
 ### Video Generation (Image-to-Video)
 

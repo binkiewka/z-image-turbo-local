@@ -97,7 +97,7 @@ fi
 
 # 2. Directory Setup
 echo -e "\n${YELLOW}[2/5] Creating Directory Structure...${NC}"
-mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler models/vfi
+mkdir -p models/diffusion_models models/text_encoders models/vae models/loras/image models/upscaler models/vfi
 echo -e "${GREEN}✓ Directories created${NC}"
 
 # 3. Model Downloads
@@ -170,6 +170,7 @@ fi
 read -p "Do you want to download Upscaler and Frame Interpolation models? (~300MB) (y/N) " download_extras
 if [[ "$download_extras" =~ ^[Yy]$ ]]; then
     download_file "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x2.pth" "models/upscaler/RealESRGAN_x2.pth" "RealESRGAN x2"
+    download_file "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Siax_200k.pth" "models/upscaler/4x_NMKD-Siax_200k.pth" "NMKD Siax x4"
     download_file "https://huggingface.co/hfmaster/models-moved/resolve/main/rife/rife49.pth" "models/vfi/rife49.pth" "RIFE 4.9"
 fi
 
