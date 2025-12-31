@@ -28,6 +28,9 @@ function app() {
             aspectRatio: '1:1',
             seed: -1,
             steps: 8,
+            cfg: 1.0,
+            sampler: 'euler',
+            scheduler: 'sgm_uniform',
             numImages: 1,
             loras: [],
             upscaleEnabled: false,
@@ -77,7 +80,17 @@ function app() {
         models: {
             video: { high: [], low: [], loras_high: [], loras_low: [] },
             enhancement: { upscale: [], vfi: [] },
-            image: { aspect_ratios: [], loras: [] }
+            image: { aspect_ratios: [], loras: [] },
+            samplers: [
+                "euler", "euler_ancestral", "heun", "heunpp2",
+                "dpm_2", "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
+                "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu",
+                "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu",
+                "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm"
+            ],
+            schedulers: [
+                "normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "beta"
+            ]
         },
 
         // Toast notifications
@@ -162,7 +175,9 @@ function app() {
                         image: {
                             aspect_ratios: data.image?.aspect_ratios || [],
                             loras: data.image?.loras || []
-                        }
+                        },
+                        samplers: data.samplers || [],
+                        schedulers: data.schedulers || []
                     };
 
                     // Default Upscale Model for Image if available
@@ -340,9 +355,16 @@ function app() {
                         aspect_ratio: this.imageSettings.aspectRatio,
                         seed: this.imageSettings.seed,
                         steps: this.imageSettings.steps,
+                        cfg: parseFloat(this.imageSettings.cfg),
+                        sampler_name: this.imageSettings.sampler,
+                        scheduler: this.imageSettings.scheduler,
                         aspect_ratio: this.imageSettings.aspectRatio,
                         num_images: this.imageSettings.numImages,
-                        loras: this.imageSettings.loras.filter(l => l.name.length > 0).map(l => ({ name: l.name, strength: parseFloat(l.strength) })),
+                        loras: this.imageSettings.loras.filter(l => l.name.length > 0).map(l => ({
+                            name: l.name,
+                            strength_model: parseFloat(l.strength_model),
+                            strength_clip: parseFloat(l.strength_clip)
+                        })),
                         upscale_enabled: this.imageSettings.upscaleEnabled,
                         upscale_model: this.imageSettings.upscaleEnabled ? this.imageSettings.upscaleModel : null
                     })
@@ -606,7 +628,7 @@ function app() {
         },
 
         addLora() {
-            this.imageSettings.loras.push({ name: '', strength: 1.0 });
+            this.imageSettings.loras.push({ name: '', strength_model: 1.0, strength_clip: 1.0 });
         },
 
         removeLora(index) {

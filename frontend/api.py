@@ -32,6 +32,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+# Suppress /api/health logs
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("GET /api/health") == -1
+
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
+
 # ComfyUI connection settings
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
 COMFYUI_PORT = os.environ.get("COMFYUI_PORT", "8188")
@@ -103,7 +110,8 @@ def load_gallery_from_disk():
 
 class LoraConfig(BaseModel):
     name: str
-    strength: float = 1.0
+    strength_model: float = 1.0
+    strength_clip: float = 1.0
 
 
 class ImageGenerateRequest(BaseModel):
@@ -113,6 +121,9 @@ class ImageGenerateRequest(BaseModel):
     aspect_ratio: str = "1:1"
     num_images: int = 1
     loras: list[LoraConfig] = []
+    cfg: float = 1.0
+    sampler_name: str = "euler"
+    scheduler: str = "sgm_uniform"
     upscale_enabled: bool = False
     upscale_model: Optional[str] = None
 
@@ -143,7 +154,7 @@ class EnhanceRequest(BaseModel):
 # Helper Functions
 # =============================================================================
 
-def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1, loras: list[LoraConfig] = [], upscale_enabled: bool = False, upscale_model: str = None) -> tuple[dict, int]:
+def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1, loras: list[LoraConfig] = [], cfg: float = 1.0, sampler_name: str = "euler", scheduler: str = "sgm_uniform", upscale_enabled: bool = False, upscale_model: str = None) -> tuple[dict, int]:
     """Prepare the image workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
 
@@ -154,6 +165,11 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
         seed = random.randint(0, 2**32 - 1)
     workflow["10"]["inputs"]["seed"] = seed
     workflow["10"]["inputs"]["steps"] = steps
+    workflow["10"]["inputs"]["seed"] = seed
+    workflow["10"]["inputs"]["steps"] = steps
+    workflow["10"]["inputs"]["cfg"] = cfg
+    workflow["10"]["inputs"]["sampler_name"] = sampler_name
+    workflow["10"]["inputs"]["scheduler"] = scheduler
     workflow["5"]["inputs"]["width"] = width
     workflow["5"]["inputs"]["height"] = height
     workflow["5"]["inputs"]["batch_size"] = num_images
@@ -186,8 +202,8 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
             workflow[node_id] = {
                 "inputs": {
                     "lora_name": lora_config.name,
-                    "strength_model": lora_config.strength,
-                    "strength_clip": lora_config.strength,
+                    "strength_model": lora_config.strength_model,
+                    "strength_clip": lora_config.strength_clip,
                     "model": last_model_node,
                     "clip": last_clip_node
                 },
@@ -632,7 +648,17 @@ async def get_models():
         "image": {
             "aspect_ratios": list(ASPECT_RATIOS.keys()),
             "loras": sorted(image_models["loras"]),
-        }
+        },
+        "samplers": [
+            "euler", "euler_ancestral", "heun", "heunpp2", 
+            "dpm_2", "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive", 
+            "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu", 
+            "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu", 
+            "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm"
+        ],
+        "schedulers": [
+            "normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "beta"
+        ]
     }
 
 
@@ -686,6 +712,9 @@ async def generate_image_endpoint(request: ImageGenerateRequest):
 
         request.num_images,
         request.loras,
+        request.cfg,
+        request.sampler_name,
+        request.scheduler,
         request.upscale_enabled,
         request.upscale_model
     )
