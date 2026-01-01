@@ -285,22 +285,6 @@ def prepare_video_workflow(
     # Enhancement nodes (I2V: VAE decode is node 15)
     current_image_node = ["15", 0]
 
-    if upscale_enabled and upscale_model:
-        workflow["100"] = {
-            "inputs": {"model_name": upscale_model},
-            "class_type": "UpscaleModelLoader",
-            "_meta": {"title": "Load Upscale Model"}
-        }
-        workflow["101"] = {
-            "inputs": {
-                "upscale_model": ["100", 0],
-                "image": current_image_node
-            },
-            "class_type": "ImageUpscaleWithModel",
-            "_meta": {"title": "Upscale Image"}
-        }
-        current_image_node = ["101", 0]
-
     if interpolate_enabled and interpolate_model:
         workflow["102"] = {
             "inputs": {
@@ -316,6 +300,22 @@ def prepare_video_workflow(
             "_meta": {"title": "RIFE Frame Interpolation"}
         }
         current_image_node = ["102", 0]
+
+    if upscale_enabled and upscale_model:
+        workflow["100"] = {
+            "inputs": {"model_name": upscale_model},
+            "class_type": "UpscaleModelLoader",
+            "_meta": {"title": "Load Upscale Model"}
+        }
+        workflow["101"] = {
+            "inputs": {
+                "upscale_model": ["100", 0],
+                "image": current_image_node
+            },
+            "class_type": "ImageUpscaleWithModel",
+            "_meta": {"title": "Upscale Image"}
+        }
+        current_image_node = ["101", 0]
 
     combine_node_id = "16"  # I2V video combine node
 
@@ -742,6 +742,9 @@ async def generate_image_endpoint(request: ImageGenerateRequest):
 @app.post("/api/generate-video")
 async def generate_video_endpoint(request: VideoGenerateRequest):
     """Start video generation. Returns client_id for WebSocket progress."""
+    # Free memory before starting heavy video generation
+    await free_comfyui_memory()
+
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt cannot be empty")
 
@@ -820,18 +823,22 @@ async def get_result(prompt_id: str, type: str = "image"):
             if result:
                 images = []
                 for i, (filename, subfolder) in enumerate(result):
-                    # Check if file already exists in output (shared volume)
                     download_path = DOWNLOAD_DIR / filename
                     
-                    if not download_path.exists():
-                        # Fetch and save if not found (e.g. remote ComfyUI)
+                    # Always fetch from ComfyUI to ensure we have the latest version
+                    # (Fixes issue where filename reuse causes old images to be served)
+                    try:
                         image = await fetch_image(filename, subfolder)
-                        
-                        # Use original filename if possible, else timestamp
-                        # But here we try to match what ComfyUI produced
                         image.save(download_path)
+                    except Exception as e:
+                        # If fetch fails but file exists (e.g. shared volume + connection issue), allow it
+                        if not download_path.exists():
+                            logger.error(f"Failed to fetch image {filename}: {e}")
+                            raise e
+                        logger.warning(f"Could not fetch image {filename} (using local copy): {e}")
                     
-                    img_url = f"/api/download/{download_path.name}"
+                    # Add timestamp to URL to bust browser cache
+                    img_url = f"/api/download/{download_path.name}?t={int(time.time())}"
 
                     images.append({
                         "url": img_url,

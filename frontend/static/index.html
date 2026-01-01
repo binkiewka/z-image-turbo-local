@@ -814,11 +814,26 @@
                                 class="w-full h-full"></video>
                         </div>
 
-                        <!-- Status -->
-                        <div class="p-3 rounded-lg border"
-                            :class="videoStatusType === 'error' ? 'bg-red-900/30 border-red-900/50 text-red-400' : 'bg-surface-light border-gray-700/50 text-gray-300'">
-                            <p class="text-xs font-medium mb-1">Status</p>
-                            <p class="text-xs" x-text="videoStatusMessage || 'Ready to generate'"></p>
+                        <!-- Usage Guide -->
+                        <div class="mt-4 p-4 rounded-xl bg-surface-light border border-gray-700/50">
+                            <h4 class="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Usage Tips
+                            </h4>
+                            <ul class="space-y-2 text-xs text-gray-400">
+                                <li class="flex gap-2">
+                                    <span class="text-accent">•</span>
+                                    <span><strong>12GB VRAM (3060):</strong> 480p ~6m, 720p ~25m. Max <strong>x2
+                                            Upscale</strong>.</span>
+                                </li>
+                                <li class="flex gap-2">
+                                    <span class="text-accent">•</span>
+                                    <span><strong>24GB+ VRAM (4090):</strong> 720p ~5-6m. Can handle x4 Upscale.</span>
+                                </li>
+                                <li class="flex gap-2">
+                                    <span class="text-accent">•</span>
+                                    <span><strong>Interpolation:</strong> Now happens <em>before</em> upscale for
+                                        efficiency.</span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
 
