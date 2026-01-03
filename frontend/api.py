@@ -363,7 +363,7 @@ def prepare_character_workflow(
     workflow["8"]["inputs"]["system_prompt"] = system_prompt
     workflow["8"]["inputs"]["user_prompt"] = first_turn.get("user_prompt", "")
     workflow["8"]["inputs"]["thinking_content"] = first_turn.get("thinking_content", "")
-    workflow["8"]["inputs"]["assistant_content"] = first_turn.get("assistant_content", "Here's the character portrait.")
+    workflow["8"]["inputs"]["assistant_content"] = first_turn.get("assistant_content", "")
     workflow["8"]["inputs"]["template_preset"] = template_preset
     workflow["8"]["inputs"]["add_think_block"] = True
     
@@ -457,20 +457,12 @@ def prepare_character_workflow(
 
 
 def _generate_preservation_thinking(character_name: str, character_sheet: str, modification: str) -> str:
-    """
-    Generate thinking content that explicitly states what to preserve vs change.
-    
-    Per Z-Image guide: Think blocks should explicitly list preserved features.
-    """
-    # Extract key features from character sheet for preservation list
     preserved_features = []
     
-    # Look for common feature patterns in the character sheet
     sheet_lower = character_sheet.lower()
     if "eye" in sheet_lower:
         preserved_features.append("eye color and shape")
     if "hair" in sheet_lower and "hair" not in modification.lower():
-        # Only preserve hair if we're not modifying it
         preserved_features.append("hair color and style")
     if "skin" in sheet_lower:
         preserved_features.append("skin tone")
@@ -481,7 +473,6 @@ def _generate_preservation_thinking(character_name: str, character_sheet: str, m
     if "earring" in sheet_lower or "necklace" in sheet_lower or "jewelry" in sheet_lower:
         preserved_features.append("signature jewelry/accessories")
     
-    # Default preserved features if none detected
     if not preserved_features:
         preserved_features = [
             "facial structure",
@@ -492,13 +483,13 @@ def _generate_preservation_thinking(character_name: str, character_sheet: str, m
     
     preservation_list = ", ".join(preserved_features)
     
-    return f"""Modifying {character_name} based on request: {modification}
+    return f"""Modifying the subject based on request: {modification}
 
 PRESERVING (must stay exactly the same): {preservation_list}
 
 CHANGING: {modification}
 
-Ensure the character remains recognizable. Only apply the specific requested change while maintaining all other established features from the character sheet."""
+Ensure the subject remains recognizable. Only apply the specific requested change while maintaining all other established features."""
 
 
 def prepare_video_workflow(
@@ -1265,7 +1256,7 @@ async def create_character_session(request: CharacterCreateRequest):
     
     # Generate detailed thinking content for the initial character
     # Per Z-Image guide: think block should list key features to ensure
-    initial_thinking = f"""Creating initial portrait of {request.name} as defined in the character sheet.
+    initial_thinking = """Creating initial portrait as defined in the character sheet.
 
 KEY FEATURES TO ENSURE:
 - All facial features exactly as described
@@ -1275,7 +1266,7 @@ KEY FEATURES TO ENSURE:
 - Signature accessories or jewelry mentioned
 - Default attire and color palette
 
-This is the reference portrait that establishes the character's identity for all future modifications."""
+This is the reference portrait that establishes the subject's identity for all future modifications."""
     
     session_data = {
         "id": session_id,
@@ -1287,7 +1278,7 @@ This is the reference portrait that establishes the character's identity for all
             "role": "user",
             "user_prompt": character_sheet,
             "thinking_content": initial_thinking,
-            "assistant_content": f"Here's {request.name}'s portrait as specified in the character sheet."
+            "assistant_content": ""
         }],
         "created_at": time.time()
     }
@@ -1330,7 +1321,7 @@ async def add_character_turn(session_id: str, request: CharacterTurnRequest):
         "role": "user",
         "user_prompt": request.user_prompt,
         "thinking_content": thinking_content or "",
-        "assistant_content": f"Here's {session.get('name', 'the character')} with the requested modification."
+        "assistant_content": ""
     }
     
     session["turns"].append(turn)
