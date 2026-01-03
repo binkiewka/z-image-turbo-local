@@ -66,6 +66,14 @@ RUN git clone https://github.com/jamesWalker55/comfyui-various.git && \
 # ComfyUI-Custom-Scripts (MathExpression node)
 RUN git clone https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git
 
+# ============================================
+# Z-Image Character Consistency Custom Nodes
+# ============================================
+
+# ComfyUI-QwenImageWanBridge (ZImageTextEncoder, ZImageTurnBuilder for multi-turn character consistency)
+RUN git clone https://github.com/fblissjr/ComfyUI-QwenImageWanBridge.git && \
+    if [ -f ComfyUI-QwenImageWanBridge/requirements.txt ]; then pip3 install --no-cache-dir -r ComfyUI-QwenImageWanBridge/requirements.txt; fi
+
 # Return to ComfyUI root
 WORKDIR /app/ComfyUI
 

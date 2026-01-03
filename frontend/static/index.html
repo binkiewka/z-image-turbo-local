@@ -31,6 +31,8 @@
         }
     </script>
 
+    <!-- Alpine.js Collapse Plugin -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
@@ -193,7 +195,6 @@
             position: absolute;
         }
 
-        /* Accordion animation */
         .accordion-content {
             max-height: 0;
             overflow: hidden;
@@ -202,6 +203,14 @@
 
         .accordion-content.open {
             max-height: 500px;
+        }
+
+        .accordion-chevron {
+            transition: transform 0.2s ease;
+        }
+
+        .accordion-chevron.open {
+            transform: rotate(180deg);
         }
 
         /* Dark dropdown options */
@@ -274,6 +283,25 @@
             <div x-show="activeTab === 'image'" x-transition:enter="transition ease-out duration-300"
                 x-transition:enter-start="opacity-0 transform translate-y-4"
                 x-transition:enter-end="opacity-100 transform translate-y-0">
+                
+                <!-- Mode Toggle -->
+                <div class="flex justify-center mb-6">
+                    <div class="inline-flex rounded-xl bg-surface-light p-1">
+                        <button @click="characterMode = false"
+                            :class="!characterMode ? 'bg-accent text-black' : 'text-gray-400 hover:text-white'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200">
+                            Standard Mode
+                        </button>
+                        <button @click="toggleCharacterMode()"
+                            :class="characterMode ? 'bg-accent text-black' : 'text-gray-400 hover:text-white'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200">
+                            Character Mode
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Standard Mode Content -->
+                <div x-show="!characterMode">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     <!-- Left Panel: Controls -->
                     <div class="glass rounded-2xl p-6 glass-hover h-full flex flex-col">
@@ -421,7 +449,7 @@
                                         <div class="mb-3 bg-white/5 p-2 rounded-lg border border-gray-700/30">
                                             <div class="flex gap-2 mb-2">
                                                 <select x-model="model.name"
-                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm">
+                                                    class="flex-1 min-w-0 bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm truncate">
                                                     <option value="">Select LoRA...</option>
                                                     <template x-for="l in models.image.loras" :key="l">
                                                         <option :value="l" x-text="l.split('/').pop()"></option>
@@ -566,7 +594,290 @@
                         </div>
                     </div>
                 </div>
+                </div>
 
+                <div x-show="characterMode" x-transition>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 glass rounded-2xl p-6 glass-hover">
+                            <template x-if="!characterSession">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-white mb-4">Create Character</h3>
+                                    
+                                    <div class="mb-4">
+                                        <label class="block text-sm text-gray-400 mb-2">Quick Generate from Concept</label>
+                                        <div class="flex gap-2">
+                                            <input type="text" x-model="characterConcept" placeholder="e.g., cyberpunk hacker girl, mid-20s"
+                                                class="flex-1 bg-black/30 border border-gray-700/50 rounded-lg px-4 py-2 text-white placeholder-gray-500 text-sm">
+                                            <button @click="generateCharacterFromConcept()" :disabled="isGeneratingSheet || !characterConcept.trim()"
+                                                class="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black font-medium rounded-lg transition-colors text-sm">
+                                                <span x-show="!isGeneratingSheet">Generate</span>
+                                                <span x-show="isGeneratingSheet">...</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-gray-700/50 my-4 pt-4">
+                                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">Core Identity</div>
+                                        <div class="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Name</label>
+                                                <input type="text" x-model="characterForm.name" placeholder="Sarah Chen"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Age</label>
+                                                <input type="text" x-model="characterForm.age" placeholder="28"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Gender</label>
+                                                <select x-model="characterForm.gender"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.genders"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Ethnicity</label>
+                                                <input type="text" x-model="characterForm.ethnicity" placeholder="Chinese-American"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Build</label>
+                                                <select x-model="characterForm.build"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.builds"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-gray-700/50 my-4 pt-4">
+                                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">Face & Features</div>
+                                        <div class="grid grid-cols-3 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Face Shape</label>
+                                                <select x-model="characterForm.faceShape"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.faceShapes"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Skin</label>
+                                                <input type="text" x-model="characterForm.skin" placeholder="Fair with freckles"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Expression</label>
+                                                <select x-model="characterForm.expression"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.expressions"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Eye Color</label>
+                                                <input type="text" x-model="characterForm.eyeColor" placeholder="Dark brown"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Eye Shape</label>
+                                                <input type="text" x-model="characterForm.eyeShape" placeholder="Almond-shaped"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Eyebrows</label>
+                                                <input type="text" x-model="characterForm.eyebrows" placeholder="Thin, arched"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Nose</label>
+                                                <input type="text" x-model="characterForm.nose" placeholder="Small, straight"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Lips</label>
+                                                <input type="text" x-model="characterForm.lips" placeholder="Full, natural"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-gray-700/50 my-4 pt-4">
+                                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">Hair</div>
+                                        <div class="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Color</label>
+                                                <input type="text" x-model="characterForm.hairColor" placeholder="Black with highlights"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Length</label>
+                                                <select x-model="characterForm.hairLength"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.hairLengths"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Style</label>
+                                                <input type="text" x-model="characterForm.hairStyle" placeholder="Layered, side-swept"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white placeholder-gray-500 text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">Texture</label>
+                                                <select x-model="characterForm.hairTexture"
+                                                    class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-2 py-2 text-white text-sm">
+                                                    <template x-for="opt in characterOptions.hairTextures"><option :value="opt" x-text="opt"></option></template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-gray-700/50 my-4 pt-4">
+                                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">Distinguishing Features</div>
+                                        <textarea x-model="characterForm.distinguishingFeatures" rows="2"
+                                            placeholder="Beauty mark below right eye, silver nose ring, small scar on left eyebrow..."
+                                            class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 resize-none text-sm"></textarea>
+                                    </div>
+                                    
+                                    <div class="border-t border-gray-700/50 my-4 pt-4">
+                                        <div class="text-xs text-gray-500 uppercase tracking-wide mb-3">Default Attire</div>
+                                        <textarea x-model="characterForm.defaultAttire" rows="2"
+                                            placeholder="Black leather jacket, dark jeans, silver jewelry..."
+                                            class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 resize-none text-sm"></textarea>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label class="block text-sm text-gray-400 mb-2">Style Preset</label>
+                                            <select x-model="characterTemplatePreset"
+                                                class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm">
+                                                <template x-for="preset in characterTemplatePresets">
+                                                    <option :value="preset" x-text="preset.replace('_', ' ')"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm text-gray-400 mb-2">Aspect Ratio</label>
+                                            <select x-model="imageSettings.aspectRatio"
+                                                class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm">
+                                                <option value="1:1">1:1</option>
+                                                <option value="3:4">3:4 (Portrait)</option>
+                                                <option value="4:3">4:3</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex gap-3">
+                                        <button @click="createCharacter()" :disabled="isCreatingCharacter || !characterForm.name.trim()"
+                                            class="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black font-semibold py-3 px-6 rounded-xl transition-all">
+                                            <span x-show="!isCreatingCharacter">Create Character</span>
+                                            <span x-show="isCreatingCharacter">Creating...</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            
+                            <template x-if="characterSession">
+                                <div>
+                                    <div class="flex items-center justify-between mb-4">
+                                        <h3 class="text-lg font-semibold text-white" x-text="characterSession.name"></h3>
+                                        <button @click="clearCharacterSession()" class="text-gray-400 hover:text-white text-sm">
+                                            New Character
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="space-y-3 mb-6 max-h-64 overflow-y-auto">
+                                        <template x-for="(turn, index) in characterSession.turns" :key="index">
+                                            <div class="bg-black/20 rounded-lg p-3">
+                                                <div class="text-xs text-gray-500 mb-1" x-text="'Turn ' + (index + 1)"></div>
+                                                <div class="text-sm text-gray-300" x-text="turn.user_prompt.substring(0, 150) + (turn.user_prompt.length > 150 ? '...' : '')"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <label class="block text-sm text-gray-400 mb-2">Add Modification</label>
+                                        <textarea x-model="newTurnPrompt" rows="2"
+                                            placeholder="Keep the face, change outfit to a red dress..."
+                                            class="w-full bg-black/30 border border-gray-700/50 rounded-lg px-4 py-3 text-white placeholder-gray-500 resize-none text-sm"></textarea>
+                                    </div>
+                                    
+                                    <div class="flex gap-3">
+                                        <button @click="addCharacterTurn()" :disabled="!newTurnPrompt.trim()"
+                                            class="px-4 py-3 bg-surface-light hover:bg-gray-700 disabled:opacity-50 text-gray-300 font-medium rounded-xl">
+                                            Add Turn
+                                        </button>
+                                        <button @click="generateCharacterImage()" :disabled="isGenerating"
+                                            class="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-50 text-black font-semibold py-3 px-6 rounded-xl">
+                                            <span x-show="!isGenerating">Generate</span>
+                                            <span x-show="isGenerating" class="flex items-center justify-center gap-2">
+                                                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Generating...
+                                            </span>
+                                        </button>
+                                    </div>
+                                    
+                                    <div x-show="isGenerating" class="mt-4">
+                                        <div class="flex justify-between text-xs text-gray-400 mb-2">
+                                            <span x-text="progressText"></span>
+                                            <span x-text="Math.round(progress) + '%'"></span>
+                                        </div>
+                                        <div class="w-full bg-gray-800 rounded-full h-2">
+                                            <div class="bg-accent h-2 rounded-full transition-all duration-300" :style="'width: ' + progress + '%'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div class="glass rounded-2xl p-6 glass-hover">
+                            <div x-show="currentImage" class="mb-6">
+                                <img :src="currentImage" @click="openFullscreen(currentImage)"
+                                    class="w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity" alt="Generated">
+                            </div>
+                            <div x-show="!currentImage && !characterSession" class="mb-6">
+                                <h4 class="text-sm font-medium text-gray-400 mb-3">Character Sheet Preview</h4>
+                                <div class="bg-black/20 rounded-lg p-3 max-h-64 overflow-y-auto">
+                                    <pre class="text-xs text-gray-400 whitespace-pre-wrap font-mono" x-text="buildCharacterSheet()"></pre>
+                                </div>
+                            </div>
+                            <div x-show="!currentImage && characterSession" class="aspect-square bg-black/20 rounded-lg flex items-center justify-center mb-6">
+                                <span class="text-gray-600 text-sm">Result will appear here</span>
+                            </div>
+                            
+                            <h4 class="text-sm font-medium text-gray-400 mb-3">Previous Sessions</h4>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                <template x-for="session in characterSessions" :key="session.id">
+                                    <div class="flex items-center justify-between bg-black/20 rounded-lg p-2 hover:bg-black/30 cursor-pointer"
+                                        @click="loadCharacterSession(session.id)">
+                                        <div>
+                                            <div class="text-sm text-white" x-text="session.name"></div>
+                                            <div class="text-xs text-gray-500" x-text="session.turns + ' turns'"></div>
+                                        </div>
+                                        <button @click.stop="deleteCharacterSession(session.id)" class="text-gray-500 hover:text-red-400 p-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+                                <div x-show="characterSessions.length === 0" class="text-center py-4 text-xs text-gray-600">
+                                    No saved sessions
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
             </div>
 
@@ -670,10 +981,10 @@
                         <p class="text-xs text-gray-500 mt-2 text-center">Takes 15-20 min</p>
                     </div>
 
-                    <!-- Column 2: Models & Enhancement -->
-                    <div class="glass rounded-2xl p-6 glass-hover h-full min-h-[575px]">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-sm font-semibold text-white">Models</h3>
+                    <!-- Column 2: Models & LoRAs -->
+                    <div class="glass rounded-2xl p-5 glass-hover h-full min-h-[575px]">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-white">Models & LoRAs</h3>
                             <button @click="refreshModels()"
                                 class="flex items-center gap-1 px-2 py-1 text-xs bg-surface-light hover:bg-gray-700 border border-gray-600 rounded text-gray-300 hover:text-white transition-colors">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -684,89 +995,149 @@
                             </button>
                         </div>
 
-                        <!-- Model Dropdowns -->
-                        <div class="space-y-3 mb-5">
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">High Noise Model</label>
-                                <select x-model="videoSettings.modelHigh"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white">
-                                    <template x-for="m in models.video.high" :key="m">
-                                        <option :value="m" x-text="m.split('/').pop()"></option>
-                                    </template>
-                                </select>
+                        <!-- System Models Accordion -->
+                        <div class="border border-gray-700/50 rounded-lg mb-3 overflow-hidden">
+                            <button @click="videoAccordion.systemModels = !videoAccordion.systemModels"
+                                class="w-full flex items-center justify-between px-3 py-2 bg-surface-light/50 hover:bg-surface-light text-left transition-colors">
+                                <span class="text-xs font-medium text-gray-300">System Models (4-Step)</span>
+                                <svg class="w-4 h-4 text-gray-400 accordion-chevron" :class="{ 'open': videoAccordion.systemModels }"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div x-show="videoAccordion.systemModels" x-collapse class="px-3 py-2 space-y-2 bg-black/20">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">High Noise Model</label>
+                                    <select x-model="videoSettings.modelHigh"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white">
+                                        <template x-for="m in models.video.high" :key="m">
+                                            <option :value="m" x-text="m.split('/').pop()"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Low Noise Model</label>
+                                    <select x-model="videoSettings.modelLow"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white">
+                                        <template x-for="m in models.video.low" :key="m">
+                                            <option :value="m" x-text="m.split('/').pop()"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">High Noise LoRA (Lightning)</label>
+                                    <select x-model="videoSettings.loraHigh"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white">
+                                        <template x-for="l in models.video.loras_high" :key="l">
+                                            <option :value="l" x-text="l.split('/').pop()"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Low Noise LoRA (Lightning)</label>
+                                    <select x-model="videoSettings.loraLow"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white">
+                                        <template x-for="l in models.video.loras_low" :key="l">
+                                            <option :value="l" x-text="l.split('/').pop()"></option>
+                                        </template>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">Low Noise Model</label>
-                                <select x-model="videoSettings.modelLow"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white">
-                                    <template x-for="m in models.video.low" :key="m">
-                                        <option :value="m" x-text="m.split('/').pop()"></option>
-                                    </template>
-                                </select>
+                        </div>
+
+                        <!-- Style LoRAs Section -->
+                        <div class="mb-3 pt-3 border-t border-gray-700/50">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-400">Style LoRAs (High Noise)</span>
+                                <button @click="addVideoLoraHigh()" class="text-xs text-accent hover:text-accent-hover font-medium">+ Add</button>
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">High Noise LoRA</label>
-                                <select x-model="videoSettings.loraHigh"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white">
-                                    <template x-for="l in models.video.loras_high" :key="l">
-                                        <option :value="l" x-text="l.split('/').pop()"></option>
-                                    </template>
-                                </select>
+                            <div class="space-y-2">
+                                <template x-for="(lora, index) in videoSettings.lorasHighUser" :key="index">
+                                    <div class="flex items-center gap-2 bg-white/5 p-2 rounded border border-gray-700/30 overflow-hidden">
+                                        <select x-model="lora.name" class="flex-1 min-w-0 bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white truncate">
+                                            <option value="">Select...</option>
+                                            <template x-for="l in models.video.style_loras" :key="l">
+                                                <option :value="l" x-text="l.split('/').pop()"></option>
+                                            </template>
+                                        </select>
+                                        <input type="range" x-model.number="lora.strength_model" min="0.1" max="2.0" step="0.1" class="w-16 h-1 accent-accent">
+                                        <span class="text-xs text-gray-300 w-6" x-text="lora.strength_model"></span>
+                                        <button @click="removeVideoLoraHigh(index)" class="text-gray-500 hover:text-red-400">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">Low Noise LoRA</label>
-                                <select x-model="videoSettings.loraLow"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white">
-                                    <template x-for="l in models.video.loras_low" :key="l">
-                                        <option :value="l" x-text="l.split('/').pop()"></option>
-                                    </template>
-                                </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-400">Style LoRAs (Low Noise)</span>
+                                <button @click="addVideoLoraLow()" class="text-xs text-accent hover:text-accent-hover font-medium">+ Add</button>
+                            </div>
+                            <div class="space-y-2">
+                                <template x-for="(lora, index) in videoSettings.lorasLowUser" :key="index">
+                                    <div class="flex items-center gap-2 bg-white/5 p-2 rounded border border-gray-700/30 overflow-hidden">
+                                        <select x-model="lora.name" class="flex-1 min-w-0 bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white truncate">
+                                            <option value="">Select...</option>
+                                            <template x-for="l in models.video.style_loras" :key="l">
+                                                <option :value="l" x-text="l.split('/').pop()"></option>
+                                            </template>
+                                        </select>
+                                        <input type="range" x-model.number="lora.strength_model" min="0.1" max="2.0" step="0.1" class="w-16 h-1 accent-accent">
+                                        <span class="text-xs text-gray-300 w-6" x-text="lora.strength_model"></span>
+                                        <button @click="removeVideoLoraLow(index)" class="text-gray-500 hover:text-red-400">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
                             </div>
                         </div>
 
                         <!-- Enhancement Section -->
-                        <h3 class="text-sm font-semibold text-white mb-3 pt-3 border-t border-gray-700/50">Enhancement
-                        </h3>
-
-                        <div class="space-y-3">
-                            <!-- Upscaling -->
-                            <div>
-                                <label class="flex items-center gap-2 cursor-pointer mb-1">
-                                    <input type="checkbox" x-model="videoSettings.upscaleEnabled"
-                                        class="accent-accent w-3.5 h-3.5">
-                                    <span class="text-xs text-gray-300">Upscaling</span>
-                                </label>
-                                <select x-model="videoSettings.upscaleModel" :disabled="!videoSettings.upscaleEnabled"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white disabled:opacity-50">
-                                    <option value="" x-show="models.enhancement.upscale.length === 0">No models</option>
-                                    <template x-for="m in models.enhancement.upscale" :key="m">
-                                        <option :value="m" x-text="m"></option>
-                                    </template>
-                                </select>
-                            </div>
-
-                            <!-- RIFE Interpolation -->
-                            <div>
-                                <label class="flex items-center gap-2 cursor-pointer mb-1">
-                                    <input type="checkbox" x-model="videoSettings.interpolateEnabled"
-                                        class="accent-accent w-3.5 h-3.5">
-                                    <span class="text-xs text-gray-300">RIFE Interpolation</span>
-                                </label>
-                                <select x-model="videoSettings.interpolateModel"
-                                    :disabled="!videoSettings.interpolateEnabled"
-                                    class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1.5 text-xs text-white disabled:opacity-50">
-                                    <option value="" x-show="models.enhancement.vfi.length === 0">No models</option>
-                                    <template x-for="m in models.enhancement.vfi" :key="m">
-                                        <option :value="m" x-text="m"></option>
-                                    </template>
-                                </select>
-                                <div x-show="videoSettings.interpolateEnabled" class="mt-2">
-                                    <label class="block text-xs text-gray-500 mb-1">
-                                        Multiplier: <span class="text-accent"
-                                            x-text="videoSettings.interpolateMultiplier + 'x'"></span>
+                        <div class="pt-3 border-t border-gray-700/50">
+                            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Enhancement</h4>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="flex items-center gap-2 cursor-pointer mb-1">
+                                        <input type="checkbox" x-model="videoSettings.upscaleEnabled"
+                                            class="accent-accent w-3 h-3">
+                                        <span class="text-xs text-gray-300">Upscaling</span>
                                     </label>
-                                    <input type="range" x-model.number="videoSettings.interpolateMultiplier" min="2"
-                                        max="4" step="1" class="w-full accent-accent">
+                                    <select x-model="videoSettings.upscaleModel" :disabled="!videoSettings.upscaleEnabled"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white disabled:opacity-50">
+                                        <option value="" x-show="models.enhancement.upscale.length === 0">No models</option>
+                                        <template x-for="m in models.enhancement.upscale" :key="m">
+                                            <option :value="m" x-text="m"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="flex items-center gap-2 cursor-pointer mb-1">
+                                        <input type="checkbox" x-model="videoSettings.interpolateEnabled"
+                                            class="accent-accent w-3 h-3">
+                                        <span class="text-xs text-gray-300">RIFE Interpolation</span>
+                                    </label>
+                                    <select x-model="videoSettings.interpolateModel"
+                                        :disabled="!videoSettings.interpolateEnabled"
+                                        class="w-full bg-black/30 border border-gray-700/50 rounded px-2 py-1 text-xs text-white disabled:opacity-50">
+                                        <option value="" x-show="models.enhancement.vfi.length === 0">No models</option>
+                                        <template x-for="m in models.enhancement.vfi" :key="m">
+                                            <option :value="m" x-text="m"></option>
+                                        </template>
+                                    </select>
+                                    <div x-show="videoSettings.interpolateEnabled" class="mt-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs text-gray-500">Mult:</span>
+                                            <input type="range" x-model.number="videoSettings.interpolateMultiplier" min="2"
+                                                max="4" step="1" class="flex-1 accent-accent h-1">
+                                            <span class="text-xs text-accent" x-text="videoSettings.interpolateMultiplier + 'x'"></span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

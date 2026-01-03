@@ -9,6 +9,8 @@ import os
 import logging
 import multiprocessing
 from pathlib import Path
+from typing import Optional
+
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 
@@ -74,8 +76,8 @@ Only output the final enhanced video prompt, nothing else."""
 class PromptEnhancer:
     """CPU-based prompt enhancement using Qwen2.5-7B-Instruct."""
     
-    _instance = None
-    _llm = None
+    _instance: Optional["PromptEnhancer"] = None
+    _llm: Optional[Llama] = None
     
     def __new__(cls):
         """Singleton pattern to avoid loading model multiple times."""

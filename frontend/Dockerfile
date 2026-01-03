@@ -19,6 +19,7 @@ COPY api.py .
 COPY prompt_enhancer.py .
 COPY workflow_api.json .
 COPY workflow_video_i2v.json .
+COPY workflow_character.json .
 
 # Copy static files
 COPY static/ ./static/

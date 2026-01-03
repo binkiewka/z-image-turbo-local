@@ -72,8 +72,41 @@ with open("workflow_api.json", "r") as f:
 with open("workflow_video_i2v.json", "r") as f:
     WORKFLOW_VIDEO_I2V = json.load(f)
 
-# In-memory gallery storage (last 12 images)
+with open("workflow_character.json", "r") as f:
+    WORKFLOW_CHARACTER = json.load(f)
+
 gallery_history = []
+
+character_sessions: dict[str, dict] = {}
+SESSION_DIR = Path(os.environ.get("SESSION_DIR", "/tmp/zimage_sessions"))
+SESSION_DIR.mkdir(exist_ok=True)
+
+
+def save_session(session_id: str, session_data: dict):
+    session_file = SESSION_DIR / f"{session_id}.json"
+    with open(session_file, "w") as f:
+        json.dump(session_data, f)
+    character_sessions[session_id] = session_data
+
+
+def load_session(session_id: str) -> Optional[dict]:
+    if session_id in character_sessions:
+        return character_sessions[session_id]
+    session_file = SESSION_DIR / f"{session_id}.json"
+    if session_file.exists():
+        with open(session_file, "r") as f:
+            session_data = json.load(f)
+            character_sessions[session_id] = session_data
+            return session_data
+    return None
+
+
+def delete_session(session_id: str):
+    if session_id in character_sessions:
+        del character_sessions[session_id]
+    session_file = SESSION_DIR / f"{session_id}.json"
+    if session_file.exists():
+        session_file.unlink()
 
 
 def load_gallery_from_disk():
@@ -114,6 +147,11 @@ class LoraConfig(BaseModel):
     strength_clip: float = 1.0
 
 
+class VideoLoraConfig(BaseModel):
+    name: str
+    strength_model: float = 1.0
+
+
 class ImageGenerateRequest(BaseModel):
     prompt: str
     seed: int = -1
@@ -129,7 +167,7 @@ class ImageGenerateRequest(BaseModel):
 
 
 class VideoGenerateRequest(BaseModel):
-    mode: str = "i2v"  # I2V only (T2V removed)
+    mode: str = "i2v"
     prompt: str
     seed: int = -1
     resolution: str = "480p"
@@ -138,6 +176,8 @@ class VideoGenerateRequest(BaseModel):
     model_low: str
     lora_high: str
     lora_low: str
+    loras_high_user: list[VideoLoraConfig] = []
+    loras_low_user: list[VideoLoraConfig] = []
     input_image: Optional[str] = None
     upscale_enabled: bool = False
     upscale_model: Optional[str] = None
@@ -150,11 +190,49 @@ class EnhanceRequest(BaseModel):
     prompt: str
 
 
+class CharacterTurn(BaseModel):
+    role: str
+    user_prompt: str
+    thinking_content: Optional[str] = None
+    assistant_content: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class CharacterCreateRequest(BaseModel):
+    name: str
+    description: str
+    system_prompt: Optional[str] = None
+    template_preset: str = "photorealistic"
+    aspect_ratio: str = "1:1"
+
+
+class CharacterTurnRequest(BaseModel):
+    user_prompt: str
+    thinking_content: Optional[str] = None
+    auto_think: bool = True
+
+
+class CharacterGenerateRequest(BaseModel):
+    seed: int = -1
+    steps: int = 8
+    cfg: float = 1.0
+    sampler_name: str = "euler"
+    scheduler: str = "sgm_uniform"
+    upscale_enabled: bool = False
+    upscale_model: Optional[str] = None
+    denoise: float = 0.65  # Default denoise for img2img (lower = more preserve)
+
+
+DEFAULT_CHARACTER_SYSTEM_PROMPT = """Generate a photorealistic portrait following the character sheet exactly.
+Maintain all specified features and distinguishing marks.
+Focus on consistency: preserve the character's core identity across all generations."""
+
+
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
-def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1, loras: list[LoraConfig] = [], cfg: float = 1.0, sampler_name: str = "euler", scheduler: str = "sgm_uniform", upscale_enabled: bool = False, upscale_model: str = None) -> tuple[dict, int]:
+def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int, num_images: int = 1, loras: list[LoraConfig] = [], cfg: float = 1.0, sampler_name: str = "euler", scheduler: str = "sgm_uniform", upscale_enabled: bool = False, upscale_model: Optional[str] = None) -> tuple[dict, int]:
     """Prepare the image workflow with user inputs."""
     workflow = json.loads(json.dumps(WORKFLOW_TEMPLATE))
 
@@ -244,6 +322,185 @@ def prepare_workflow(prompt: str, seed: int, steps: int, width: int, height: int
     return workflow, seed
 
 
+def prepare_character_workflow(
+    session: dict,
+    seed: int,
+    steps: int,
+    width: int,
+    height: int,
+    cfg: float = 1.0,
+    sampler_name: str = "euler",
+    scheduler: str = "sgm_uniform",
+    upscale_enabled: bool = False,
+    upscale_model: Optional[str] = None,
+    previous_image: Optional[str] = None,
+    denoise: float = 1.0
+) -> tuple[dict, int]:
+    """
+    Prepare character workflow using proper multi-turn conversation chain.
+    
+    Per Z-Image guide: https://z-image.vip/blog/z-image-character-consistency-multi-turn-guide
+    
+    Structure:
+    - Turn 1: ZImageTextEncoder (defines character)
+    - Turn 2+: ZImageTurnBuilder (chains conversation, adds modifications)
+    - Only the LAST node outputs conditioning to KSampler
+    """
+    workflow = json.loads(json.dumps(WORKFLOW_CHARACTER))
+    
+    if seed == -1:
+        seed = random.randint(0, 2**32 - 1)
+    
+    system_prompt = session.get("system_prompt", DEFAULT_CHARACTER_SYSTEM_PROMPT)
+    turns = session.get("turns", [])
+    template_preset = session.get("template_preset", "photorealistic")
+    
+    if not turns:
+        raise ValueError("No turns in session")
+    
+    # First turn uses ZImageTextEncoder (node 8)
+    first_turn = turns[0]
+    workflow["8"]["inputs"]["system_prompt"] = system_prompt
+    workflow["8"]["inputs"]["user_prompt"] = first_turn.get("user_prompt", "")
+    workflow["8"]["inputs"]["thinking_content"] = first_turn.get("thinking_content", "")
+    workflow["8"]["inputs"]["assistant_content"] = first_turn.get("assistant_content", "Here's the character portrait.")
+    workflow["8"]["inputs"]["template_preset"] = template_preset
+    workflow["8"]["inputs"]["add_think_block"] = True
+    
+    # Track what provides conditioning to KSampler
+    # For single turn: ZImageTextEncoder (node 8) output 0 = conditioning
+    # For multi-turn: Last ZImageTurnBuilder output 0 = conditioning
+    conditioning_source = ["8", 0]
+    
+    # Build ZImageTurnBuilder chain for subsequent turns
+    if len(turns) > 1:
+        # Node 8 outputs: 0=conditioning, 1=formatted_prompt, 2=conversation
+        # We need the conversation output for chaining
+        previous_conversation = ["8", 2]
+        
+        for i, turn in enumerate(turns[1:], start=1):
+            node_id = f"50_{i}"  # Turn builder nodes: 50_1, 50_2, etc.
+            is_last_turn = (i == len(turns) - 1)
+            
+            # Build thinking content that explicitly states preservation
+            thinking = turn.get("thinking_content", "")
+            if not thinking:
+                # Auto-generate thinking that emphasizes preservation
+                thinking = _generate_preservation_thinking(
+                    session.get("name", "character"),
+                    first_turn.get("user_prompt", ""),
+                    turn.get("user_prompt", "")
+                )
+            
+            workflow[node_id] = {
+                "inputs": {
+                    "user_prompt": turn.get("user_prompt", ""),
+                    "thinking_content": thinking,
+                    "is_final": is_last_turn,
+                    "previous": previous_conversation,
+                    "clip": ["7", 0]  # CLIP from loader
+                },
+                "class_type": "ZImageTurnBuilder",
+                "_meta": {"title": f"Turn {i + 1}: Modification"}
+            }
+            
+            # Update chain pointers
+            # ZImageTurnBuilder outputs: 0=conditioning (when is_final), 1=conversation
+            if is_last_turn:
+                conditioning_source = [node_id, 0]
+            previous_conversation = [node_id, 1]
+    
+    # Connect conditioning to KSampler
+    workflow["10"]["inputs"]["positive"] = conditioning_source
+    
+    # KSampler settings
+    workflow["10"]["inputs"]["seed"] = seed
+    workflow["10"]["inputs"]["steps"] = steps
+    workflow["10"]["inputs"]["cfg"] = cfg
+    workflow["10"]["inputs"]["sampler_name"] = sampler_name
+    workflow["10"]["inputs"]["scheduler"] = scheduler
+    workflow["10"]["inputs"]["denoise"] = denoise
+    
+    # Use img2img path if previous image provided
+    if previous_image:
+        workflow["20"]["inputs"]["image"] = previous_image
+        workflow["10"]["inputs"]["latent_image"] = ["21", 0]  # Use VAEEncode output
+    else:
+        # Remove unused nodes for cleaner workflow
+        del workflow["20"]
+        del workflow["21"]
+    
+    workflow["5"]["inputs"]["width"] = width
+    workflow["5"]["inputs"]["height"] = height
+    
+    current_image_node = ["6", 0]
+    
+    if upscale_enabled and upscale_model:
+        workflow["101"] = {
+            "inputs": {"model_name": upscale_model},
+            "class_type": "UpscaleModelLoader",
+            "_meta": {"title": "Load Upscale Model"}
+        }
+        workflow["102"] = {
+            "inputs": {
+                "upscale_model": ["101", 0],
+                "image": current_image_node
+            },
+            "class_type": "ImageUpscaleWithModel",
+            "_meta": {"title": "Upscale Image"}
+        }
+        current_image_node = ["102", 0]
+    
+    workflow["18"]["inputs"]["images"] = current_image_node
+    
+    return workflow, seed
+
+
+def _generate_preservation_thinking(character_name: str, character_sheet: str, modification: str) -> str:
+    """
+    Generate thinking content that explicitly states what to preserve vs change.
+    
+    Per Z-Image guide: Think blocks should explicitly list preserved features.
+    """
+    # Extract key features from character sheet for preservation list
+    preserved_features = []
+    
+    # Look for common feature patterns in the character sheet
+    sheet_lower = character_sheet.lower()
+    if "eye" in sheet_lower:
+        preserved_features.append("eye color and shape")
+    if "hair" in sheet_lower and "hair" not in modification.lower():
+        # Only preserve hair if we're not modifying it
+        preserved_features.append("hair color and style")
+    if "skin" in sheet_lower:
+        preserved_features.append("skin tone")
+    if "face" in sheet_lower:
+        preserved_features.append("face shape and structure")
+    if "mark" in sheet_lower or "scar" in sheet_lower or "tattoo" in sheet_lower:
+        preserved_features.append("distinguishing marks")
+    if "earring" in sheet_lower or "necklace" in sheet_lower or "jewelry" in sheet_lower:
+        preserved_features.append("signature jewelry/accessories")
+    
+    # Default preserved features if none detected
+    if not preserved_features:
+        preserved_features = [
+            "facial structure",
+            "eye color and shape", 
+            "skin tone",
+            "core identity features"
+        ]
+    
+    preservation_list = ", ".join(preserved_features)
+    
+    return f"""Modifying {character_name} based on request: {modification}
+
+PRESERVING (must stay exactly the same): {preservation_list}
+
+CHANGING: {modification}
+
+Ensure the character remains recognizable. Only apply the specific requested change while maintaining all other established features from the character sheet."""
+
+
 def prepare_video_workflow(
     prompt: str,
     seed: int,
@@ -255,26 +512,30 @@ def prepare_video_workflow(
     lora_high: str,
     lora_low: str,
     input_image: str,
+    loras_high_user: Optional[list[VideoLoraConfig]] = None,
+    loras_low_user: Optional[list[VideoLoraConfig]] = None,
     upscale_enabled: bool = False,
-    upscale_model: str = None,
+    upscale_model: Optional[str] = None,
     interpolate_enabled: bool = False,
-    interpolate_model: str = None,
+    interpolate_model: Optional[str] = None,
     interpolate_multiplier: int = 2
 ) -> tuple[dict, int]:
-    """Prepare the I2V video workflow with user inputs."""
+    if loras_high_user is None:
+        loras_high_user = []
+    if loras_low_user is None:
+        loras_low_user = []
+        
     workflow = json.loads(json.dumps(WORKFLOW_VIDEO_I2V))
 
     if seed == -1:
         seed = random.randint(0, 2**32 - 1)
 
-    # Update models
     workflow["2"]["inputs"]["unet_name"] = model_high
     workflow["3"]["inputs"]["unet_name"] = model_low
     workflow["4"]["inputs"]["lora_name"] = lora_high
     workflow["5"]["inputs"]["lora_name"] = lora_low
     workflow["8"]["inputs"]["text"] = prompt
 
-    # Update resolution/frames/seed (I2V node IDs)
     workflow["12"]["inputs"]["width"] = width
     workflow["12"]["inputs"]["height"] = height
     workflow["12"]["inputs"]["length"] = frames
@@ -282,7 +543,44 @@ def prepare_video_workflow(
     workflow["14"]["inputs"]["noise_seed"] = seed
     workflow["10"]["inputs"]["image"] = input_image
 
-    # Enhancement nodes (I2V: VAE decode is node 15)
+    # User Style LoRA Injection (High Noise Path)
+    # Chain: Unet(2) -> Lightning LoRA(4) -> User LoRAs(200_*) -> KSampler(13)
+    last_high_model = ["4", 0]
+    for i, lora_config in enumerate(loras_high_user):
+        if not lora_config.name:
+            continue
+        node_id = f"200_{i}"
+        workflow[node_id] = {
+            "inputs": {
+                "lora_name": lora_config.name,
+                "strength_model": lora_config.strength_model,
+                "model": last_high_model
+            },
+            "class_type": "LoraLoaderModelOnly",
+            "_meta": {"title": f"Style LoRA High {i+1}"}
+        }
+        last_high_model = [node_id, 0]
+    workflow["13"]["inputs"]["model"] = last_high_model
+
+    # User Style LoRA Injection (Low Noise Path)
+    # Chain: Unet(3) -> Lightning LoRA(5) -> User LoRAs(300_*) -> KSampler(14)
+    last_low_model = ["5", 0]
+    for i, lora_config in enumerate(loras_low_user):
+        if not lora_config.name:
+            continue
+        node_id = f"300_{i}"
+        workflow[node_id] = {
+            "inputs": {
+                "lora_name": lora_config.name,
+                "strength_model": lora_config.strength_model,
+                "model": last_low_model
+            },
+            "class_type": "LoraLoaderModelOnly",
+            "_meta": {"title": f"Style LoRA Low {i+1}"}
+        }
+        last_low_model = [node_id, 0]
+    workflow["14"]["inputs"]["model"] = last_low_model
+
     current_image_node = ["15", 0]
 
     if interpolate_enabled and interpolate_model:
@@ -466,7 +764,6 @@ def scan_video_models() -> dict:
 
 
 def scan_image_models() -> dict:
-    """Scan for Image LoRAs (in image/ folder)."""
     models = {
         "loras": []
     }
@@ -477,14 +774,33 @@ def scan_image_models() -> dict:
             if "LoraLoader" in data:
                 all_loras = data["LoraLoader"]["input"]["required"]["lora_name"][0]
                 for lora in all_loras:
-                    # Filter for LoRAs in 'image/' directory or standard/root ones if needed.
-                    # For now only taking those explicitly in image/ folder as requested.
                     if "image/" in lora.lower() or "image\\" in lora.lower():
                          models["loras"].append(lora)
     except Exception as e:
          logger.error(f"Error scanning image models: {e}")
          
     return models
+
+
+def scan_video_style_loras() -> list[str]:
+    loras = []
+    try:
+        response = httpx.get(f"{COMFYUI_URL}/object_info/LoraLoaderModelOnly", timeout=10.0)
+        if response.status_code == 200:
+            data = response.json()
+            if "LoraLoaderModelOnly" in data:
+                all_loras = data["LoraLoaderModelOnly"]["input"]["required"]["lora_name"][0]
+                logger.info(f"All LoraLoaderModelOnly LoRAs: {all_loras}")
+                for lora in all_loras:
+                    lora_lower = lora.lower()
+                    is_video_folder = "video/" in lora_lower or "video\\" in lora_lower or "videos/" in lora_lower or "videos\\" in lora_lower
+                    is_system_lora = "lightx2v" in lora_lower or "4steps" in lora_lower
+                    if is_video_folder and not is_system_lora:
+                        loras.append(lora)
+                logger.info(f"Filtered video style LoRAs: {loras}")
+    except Exception as e:
+        logger.error(f"Error scanning video style LoRAs: {e}")
+    return loras
 
 
 def scan_enhancement_models() -> dict:
@@ -626,10 +942,10 @@ async def health_check():
 
 @app.get("/api/models")
 async def get_models():
-    """Get all available models."""
     video_models = scan_video_models()
     enhancement_models = scan_enhancement_models()
     image_models = scan_image_models()
+    video_style_loras = scan_video_style_loras()
 
     all_high = sorted(video_models["i2v_high"])
     all_low = sorted(video_models["i2v_low"])
@@ -640,6 +956,7 @@ async def get_models():
             "low": all_low,
             "loras_high": sorted(video_models["loras_high"]),
             "loras_low": sorted(video_models["loras_low"]),
+            "style_loras": sorted(video_style_loras),
         },
         "enhancement": {
             "upscale": sorted(enhancement_models["upscale"]),
@@ -770,6 +1087,8 @@ async def generate_video_endpoint(request: VideoGenerateRequest):
         lora_high=request.lora_high,
         lora_low=request.lora_low,
         input_image=request.input_image,
+        loras_high_user=request.loras_high_user,
+        loras_low_user=request.loras_low_user,
         upscale_enabled=request.upscale_enabled,
         upscale_model=request.upscale_model,
         interpolate_enabled=request.interpolate_enabled,
@@ -936,6 +1255,333 @@ async def download_file(filename: str):
     return FileResponse(file_path)
 
 
+@app.post("/api/character/create")
+async def create_character_session(request: CharacterCreateRequest):
+    session_id = str(uuid.uuid4())
+    
+    character_sheet = request.description
+    if request.name:
+        character_sheet = f"# Character Profile: {request.name}\n\n{request.description}"
+    
+    # Generate detailed thinking content for the initial character
+    # Per Z-Image guide: think block should list key features to ensure
+    initial_thinking = f"""Creating initial portrait of {request.name} as defined in the character sheet.
+
+KEY FEATURES TO ENSURE:
+- All facial features exactly as described
+- Correct eye color, shape, and expression  
+- Hair color, length, style, and texture as specified
+- Skin tone and any distinguishing marks
+- Signature accessories or jewelry mentioned
+- Default attire and color palette
+
+This is the reference portrait that establishes the character's identity for all future modifications."""
+    
+    session_data = {
+        "id": session_id,
+        "name": request.name,
+        "system_prompt": request.system_prompt or DEFAULT_CHARACTER_SYSTEM_PROMPT,
+        "template_preset": request.template_preset,
+        "aspect_ratio": request.aspect_ratio,
+        "turns": [{
+            "role": "user",
+            "user_prompt": character_sheet,
+            "thinking_content": initial_thinking,
+            "assistant_content": f"Here's {request.name}'s portrait as specified in the character sheet."
+        }],
+        "created_at": time.time()
+    }
+    
+    save_session(session_id, session_data)
+    logger.info(f"Created character session: {session_id} for {request.name}")
+    
+    return {"session_id": session_id, "session": session_data}
+
+
+@app.get("/api/character/{session_id}")
+async def get_character_session(session_id: str):
+    session = load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session": session}
+
+
+@app.post("/api/character/{session_id}/turn")
+async def add_character_turn(session_id: str, request: CharacterTurnRequest):
+    session = load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    thinking_content = request.thinking_content
+    if request.auto_think and not thinking_content:
+        # Generate detailed thinking that explicitly states what to preserve vs change
+        # This is critical for Z-Image character consistency per their guide
+        character_name = session.get("name", "character")
+        first_turn = session["turns"][0] if session.get("turns") else {}
+        character_sheet = first_turn.get("user_prompt", "")
+        
+        thinking_content = _generate_preservation_thinking(
+            character_name,
+            character_sheet,
+            request.user_prompt
+        )
+    
+    turn = {
+        "role": "user",
+        "user_prompt": request.user_prompt,
+        "thinking_content": thinking_content or "",
+        "assistant_content": f"Here's {session.get('name', 'the character')} with the requested modification."
+    }
+    
+    session["turns"].append(turn)
+    save_session(session_id, session)
+    
+    return {"session": session, "turn_index": len(session["turns"]) - 1}
+
+
+@app.post("/api/character/{session_id}/generate")
+async def generate_character_image(session_id: str, request: CharacterGenerateRequest):
+    global gallery_history
+    
+    session = load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    width, height = ASPECT_RATIOS.get(session.get("aspect_ratio", "1:1"), (1024, 1024))
+    
+    # Determine if this is first generation (txt2img) or subsequent (img2img)
+    turns = session.get("turns", [])
+    previous_image = session.get("last_image")  # Filename of last generated image
+    
+    # First turn = txt2img (denoise 1.0), subsequent = img2img (use request.denoise)
+    is_first_generation = len(turns) <= 1 or not previous_image
+    effective_denoise = 1.0 if is_first_generation else request.denoise
+    
+    try:
+        workflow, actual_seed = prepare_character_workflow(
+            session=session,
+            seed=request.seed,
+            steps=request.steps,
+            width=width,
+            height=height,
+            cfg=request.cfg,
+            sampler_name=request.sampler_name,
+            scheduler=request.scheduler,
+            upscale_enabled=request.upscale_enabled,
+            upscale_model=request.upscale_model,
+            previous_image=previous_image if not is_first_generation else None,
+            denoise=effective_denoise
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    client_id = str(uuid.uuid4())
+    
+    async with httpx.AsyncClient(timeout=30.0) as http_client:
+        response = await http_client.post(
+            f"{COMFYUI_URL}/prompt",
+            json={"prompt": workflow, "client_id": client_id}
+        )
+        response.raise_for_status()
+        result = response.json()
+        prompt_id = result["prompt_id"]
+    
+    return {
+        "client_id": client_id,
+        "prompt_id": prompt_id,
+        "seed": actual_seed,
+        "session_id": session_id,
+        "turn_index": len(session["turns"]) - 1,
+        "width": width,
+        "height": height,
+        "is_img2img": not is_first_generation,
+        "denoise": effective_denoise
+    }
+
+
+class UpdateLastImageRequest(BaseModel):
+    image_filename: str
+
+
+@app.post("/api/character/{session_id}/set-image")
+async def set_character_last_image(session_id: str, request: UpdateLastImageRequest):
+    """Update the last generated image for a character session (for img2img)."""
+    session = load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session["last_image"] = request.image_filename
+    save_session(session_id, session)
+    
+    return {"status": "ok", "last_image": request.image_filename}
+
+
+@app.delete("/api/character/{session_id}")
+async def delete_character_session(session_id: str):
+    session = load_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    delete_session(session_id)
+    return {"status": "deleted", "session_id": session_id}
+
+
+@app.get("/api/character")
+async def list_character_sessions():
+    sessions = []
+    for session_file in SESSION_DIR.glob("*.json"):
+        try:
+            with open(session_file, "r") as f:
+                session = json.load(f)
+                sessions.append({
+                    "id": session.get("id"),
+                    "name": session.get("name"),
+                    "turns": len(session.get("turns", [])),
+                    "created_at": session.get("created_at")
+                })
+        except Exception:
+            continue
+    
+    sessions.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+    return {"sessions": sessions}
+
+
+@app.post("/api/character/generate-sheet")
+async def generate_character_sheet(request: EnhanceRequest):
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="Description cannot be empty")
+    
+    character_prompt = f"""Create a detailed character sheet for: {request.prompt}
+
+Format the output as a structured character profile with these sections:
+## Core Identity
+- Name, Age, Gender, Ethnicity, Build
+
+## Face & Features
+- Face Shape, Skin tone, Eyes (color, shape), Eyebrows, Nose, Lips, Expression
+
+## Hair
+- Color, Length, Style, Texture
+
+## Distinguishing Features
+- Any unique marks, scars, jewelry, accessories that should always be present
+
+## Default Attire
+- Typical clothing style, colors, materials
+
+Be extremely specific with visual details. Use concrete descriptors, not abstract concepts."""
+    
+    try:
+        loop = asyncio.get_running_loop()
+        enhanced = await loop.run_in_executor(None, enhance_prompt, character_prompt)
+        return {"original": request.prompt, "character_sheet": enhanced}
+    except Exception as e:
+        logger.error(f"Character sheet generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+class StructuredCharacterRequest(BaseModel):
+    concept: str
+
+
+class StructuredCharacterResponse(BaseModel):
+    name: str = ""
+    age: str = ""
+    gender: str = ""
+    ethnicity: str = ""
+    build: str = "Average"
+    face_shape: str = "Oval"
+    skin: str = ""
+    eye_color: str = ""
+    eye_shape: str = ""
+    eyebrows: str = ""
+    nose: str = ""
+    lips: str = ""
+    expression: str = "Neutral"
+    hair_color: str = ""
+    hair_length: str = "Medium"
+    hair_style: str = ""
+    hair_texture: str = "Straight"
+    distinguishing_features: str = ""
+    default_attire: str = ""
+
+
+@app.post("/api/character/generate-structured")
+async def generate_structured_character(request: StructuredCharacterRequest):
+    if not request.concept.strip():
+        raise HTTPException(status_code=400, detail="Concept cannot be empty")
+    
+    structured_prompt = f"""Generate a detailed character profile for: {request.concept}
+
+Return ONLY a valid JSON object with these exact fields (no markdown, no explanation):
+{{
+  "name": "character's full name",
+  "age": "specific age like 28",
+  "gender": "Female/Male/Non-binary",
+  "ethnicity": "specific ethnicity",
+  "build": "Slim/Athletic/Average/Curvy/Muscular",
+  "face_shape": "Oval/Round/Square/Heart/Oblong",
+  "skin": "detailed skin description with tone and any features",
+  "eye_color": "specific eye color",
+  "eye_shape": "eye shape description",
+  "eyebrows": "eyebrow description",
+  "nose": "nose description",
+  "lips": "lips description",
+  "expression": "Neutral/Smiling/Serious/Confident/Mysterious",
+  "hair_color": "specific hair color",
+  "hair_length": "Short/Medium/Long/Very long",
+  "hair_style": "specific hairstyle",
+  "hair_texture": "Straight/Wavy/Curly/Coily",
+  "distinguishing_features": "scars, tattoos, piercings, birthmarks - be specific",
+  "default_attire": "typical clothing style and colors"
+}}
+
+Be creative and specific. Return ONLY the JSON object, nothing else."""
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, enhance_prompt, structured_prompt)
+        
+        result = result.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.startswith("```"):
+            result = result[3:]
+        if result.endswith("```"):
+            result = result[:-3]
+        result = result.strip()
+        
+        try:
+            parsed = json.loads(result)
+            return {"success": True, "character": parsed}
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse JSON, returning raw: {result[:200]}")
+            return {"success": False, "raw": result, "character": {
+                "name": request.concept.split(",")[0].strip().title(),
+                "age": "25",
+                "gender": "Female",
+                "ethnicity": "",
+                "build": "Average",
+                "face_shape": "Oval",
+                "skin": "Natural skin tone",
+                "eye_color": "Brown",
+                "eye_shape": "Almond-shaped",
+                "eyebrows": "Natural",
+                "nose": "Proportionate",
+                "lips": "Natural",
+                "expression": "Neutral",
+                "hair_color": "Brown",
+                "hair_length": "Medium",
+                "hair_style": "Natural",
+                "hair_texture": "Straight",
+                "distinguishing_features": "",
+                "default_attire": "Casual clothing"
+            }}
+    except Exception as e:
+        logger.error(f"Structured character generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
 # =============================================================================
 # WebSocket for Progress Updates
 # =============================================================================
@@ -947,6 +1593,7 @@ NODE_ID_MAPPINGS = {
     "3": "Loading Low Noise Model...",
     "4": "Loading High Noise LoRA...",
     "5": "Loading Low Noise LoRA...",
+    "7": "Loading CLIP...",
     "8": "Encoding prompts...",
     "9": "Encoding prompts...",
     "10": "Processing input image...",
@@ -956,6 +1603,8 @@ NODE_ID_MAPPINGS = {
     "14": "Refining video (Low Noise Pass)...",
     "15": "Decoding video frames...",
     "16": "Saving video...",
+    "20": "Loading previous image...",
+    "21": "Encoding previous image...",
     "100": "Loading Upscale Model...",
     "101": "Upscaling frames...",
     "102": "Interpolating frames (RIFE)...",
@@ -1006,8 +1655,20 @@ async def websocket_progress(websocket: WebSocket, client_id: str):
                                 })
                                 return
                             else:
-                                # New node started executing
-                                status_msg = NODE_ID_MAPPINGS.get(str(node_id))
+                                node_id_str = str(node_id)
+                                status_msg = NODE_ID_MAPPINGS.get(node_id_str)
+                                
+                                if not status_msg:
+                                    if node_id_str.startswith("200_"):
+                                        idx = int(node_id_str.split("_")[1]) + 1
+                                        status_msg = f"Loading Style LoRA (High) {idx}..."
+                                    elif node_id_str.startswith("300_"):
+                                        idx = int(node_id_str.split("_")[1]) + 1
+                                        status_msg = f"Loading Style LoRA (Low) {idx}..."
+                                    elif node_id_str.startswith("50_"):
+                                        idx = int(node_id_str.split("_")[1]) + 1
+                                        status_msg = f"Processing modification turn {idx}..."
+                                
                                 if status_msg:
                                     await websocket.send_json({
                                         "type": "status",

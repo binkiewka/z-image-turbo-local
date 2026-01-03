@@ -27,11 +27,21 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 - **Full-Screen Viewer**: Click any image to view in high-detail full-screen mode
 - **Image History**: Gallery of last 12 generated images
 
+### Character Mode
+
+- **Multi-turn Consistency**: Define a character profile once and generate consistent variations across different prompts using Z-Image's native conversation chaining
+- **AI-Generated Character Sheets**: Use Qwen2.5-7B (CPU) to expand simple descriptions into detailed, structured character sheets
+- **Chat-based Editing**: Iteratively modify images ("Keep the face, change outfit to...") while preserving core identity
+- **Smart Preservation**: Auto-generated thinking blocks explicitly list what to preserve vs change for better consistency
+- **Session Management**: Persistent storage for character identities and modification history
+- **Style Presets**: Apply specialized templates like Photorealistic, Anime, Comic, or Fantasy Art
+
 ### Video Generation (WAN 2.2)
 
 - **Image-to-Video (I2V)**: Animate Z-Image generated images into videos
 - **AI Prompt Enhancement**: Cinematography-focused prompt expansion optimized for WAN 2.2 (camera movements, lighting, motion)
 - **4-Step Lightning LoRAs**: Fast generation with distilled models
+- **Custom Style LoRAs**: Apply video style LoRAs for consistent aesthetic across generations
 - **VRAM Optimized**: wanBlockSwap enables 14B parameter models on 12GB VRAM
 - **User Model Selection**: Choose any downloaded model from dropdown menus
 - **AI Upscaling**: Up to 4x resolution using RealESRGAN
@@ -53,6 +63,7 @@ A Dockerized AI image and video generation system running [Z-Image-Turbo](https:
 │  - Tabbed UI (Image / Video)                            │
 │  - WebSocket client for progress tracking               │
 │  - Prompt Enhancement (Qwen2.5-7B on CPU)               │
+│  - Character Session Management                         │
 └─────────────────────┬───────────────────────────────────┘
                       │ HTTP + WebSocket
 ┌─────────────────────▼───────────────────────────────────┐
@@ -156,8 +167,10 @@ Create model directories and download the required files:
 
 ```bash
 # Create model directories
-mkdir -p models/diffusion_models models/text_encoders models/vae models/loras models/upscaler models/vfi
+mkdir -p models/diffusion_models models/text_encoders models/vae models/loras/image models/loras/video models/upscaler models/vfi
 ```
+
+> **LoRA Folder Structure**: Place image LoRAs in `models/loras/image/` and video style LoRAs in `models/loras/video/`. The system automatically detects and lists them in the UI.
 
 #### Image Generation Models (Required)
 
@@ -202,6 +215,16 @@ wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
   "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
 wget -O models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors \
   "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+```
+
+#### Custom LoRAs (Optional)
+
+You can add your own LoRAs for both image and video generation:
+
+- **Image LoRAs**: Place in `models/loras/image/` (e.g., style, character, or concept LoRAs compatible with Z-Image/Flux)
+- **Video Style LoRAs**: Place in `models/loras/video/` (e.g., cinematic, anime, or motion style LoRAs for WAN 2.2)
+
+The UI will automatically detect and list any LoRAs in these folders.
 
 #### Improvement Models (Optional)
 
@@ -292,7 +315,8 @@ For users running inside a **Windows VM** or who prefer not to use Docker/WSL:
 5. **Select Models**:
    - **High Noise Model**: First pass model (e.g., `Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf`)
    - **Low Noise Model**: Second pass model (e.g., `Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf`)
-   - **LoRAs**: Select matching Lightning LoRAs for 4-step generation
+   - **Lightning LoRAs**: Select matching Lightning LoRAs for 4-step generation
+   - **Style LoRAs** (Optional): Add custom video style LoRAs from your `models/loras/video/` folder
 6. **Enter prompt**: Describe the motion/animation you want
 7. **Optional - Enhance Prompt**: Click **Enhance Prompt** to expand your simple prompt into a cinematic description with camera movements, lighting, and motion details optimized for WAN 2.2
 8. **Settings**:
@@ -304,6 +328,22 @@ For users running inside a **Windows VM** or who prefer not to use Docker/WSL:
 10. **Click "🎬 Generate Video"**: Takes ~15-20 minutes
 
 > **Note**: Video generation requires both High Noise and Low Noise models with matching LoRAs. The two-pass approach (high noise → low noise) produces better quality.
+
+### Character Mode
+
+Character Mode enables creating a persistent character identity that stays consistent across multiple generations through a multi-turn chat system.
+
+1. **Access Character Mode**: Toggle the **Character Mode** button at the top of the Image tab
+2. **Define Your Character**:
+   - Enter a **Character Name** and a brief **Character Description**
+   - **Optional**: Click **Generate with AI** to have the system expand your description into a detailed, structured character sheet for maximum consistency
+3. **Select Style & Ratio**: Choose a **Style Preset** (e.g., Photorealistic) and **Aspect Ratio**
+4. **Initialize**: Click **Create Character**. This saves the identity and generates the first portrait
+5. **Iterative Chat Editing**:
+   - In the **Add Modification** box, describe changes (e.g., "Change background to a rainy street, wearing a yellow raincoat")
+   - Click **Add Turn** to save the modification request
+   - Click **Generate** to create the new version while maintaining facial identity
+6. **Session Management**: Previous characters are saved in the "Previous Sessions" panel. Click any session to reload it or start a new one with the "New Character" button
 
 ## Configuration
 
@@ -384,6 +424,14 @@ The system uses ~11.4GB VRAM with default settings. If you experience OOM errors
   1. Use 480p (848x480) resolution only
   2. Reduce frames to 49-81
   3. Close other GPU applications
+
+### Character Mode: "Identity drift" or inconsistency
+
+- **Cause**: Initial description is too vague or modification prompts are conflicting
+- **Fix**:
+  1. Use the **Generate with AI** button to create a highly detailed character sheet
+  2. Keep modification turns concise (e.g., "change outfit to..." rather than a full paragraph)
+  3. Start a new session if the character identity becomes too distorted
 
 ## Development
 
